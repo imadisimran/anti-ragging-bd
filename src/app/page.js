@@ -1,6 +1,10 @@
+import { decryptEmail, encryptEmail, generateBlindIndex } from "@/lib/encryption";
 import Image from "next/image";
 
 export default function Home() {
+  // console.log(generateBlindIndex("imadisimran@gmail.com"))
+  // console.log(encryptEmail("imadisimran@gmail.com"))
+  console.log(decryptEmail("ba30478dd767b2ac204a5f80:fddabe87582458da9769b9d13747568f:31892495f837e20275e67354ac98a293e1775a18a5"))
   return (
     <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
       <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
