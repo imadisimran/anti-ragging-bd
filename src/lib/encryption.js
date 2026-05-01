@@ -14,15 +14,15 @@ export function generateBlindIndex(email) {
     .digest('hex');
 }
 
-export function encryptEmail(email) {
-  if (typeof email !== 'string' || !email.trim()) {
-    throw new Error('Invalid input: email must be a non-empty string');
+export function encryptData(data) {
+  if (typeof data !== 'string' || !data.trim()) {
+    throw new Error('Invalid input: data must be a non-empty string');
   }
 
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', encryptionKey, iv);
   
-  let encrypted = cipher.update(email, 'utf8', 'hex');
+  let encrypted = cipher.update(data, 'utf8', 'hex');
   encrypted += cipher.final('hex');
   const authTag = cipher.getAuthTag().toString('hex');
 
@@ -30,7 +30,7 @@ export function encryptEmail(email) {
   return `${iv.toString('hex')}:${authTag}:${encrypted}`;
 }
 
-export function decryptEmail(encryptedData) {
+export function decryptData(encryptedData) {
   if (typeof encryptedData !== 'string' || !encryptedData.trim()) {
     throw new Error('Invalid input: encryptedData must be a non-empty string');
   }
