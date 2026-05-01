@@ -40,7 +40,7 @@ export default function LoginPage() {
           text: "Welcome back to Anti-Ragging BD.",
           icon: "success",
           timer: 2000,
-          showConfirmButton: false,
+          showConfirmButton: true,
           timerProgressBar: true,
         });
         router.push("/");
