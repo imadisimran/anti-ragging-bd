@@ -6,7 +6,6 @@ import {
   ShieldCheck,
   Mail,
   Lock,
-  ArrowRight,
   Shield,
   Lock as LockIcon,
   Eye,
@@ -126,11 +125,10 @@ export default function LoginPage() {
             </div>
             <div className="pt-2">
               <button
-                className="w-full bg-primary text-primary-content font-semibold py-4 rounded-lg shadow-md hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                className="w-full bg-primary text-primary-content font-semibold py-4 rounded-lg shadow-md hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
                 type="submit"
               >
                 Log In
-                <ArrowRight className="w-5 h-5" />
               </button>
             </div>
           </form>

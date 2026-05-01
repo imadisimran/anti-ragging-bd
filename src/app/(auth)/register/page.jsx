@@ -7,12 +7,14 @@ import {
   User,
   Mail,
   Lock,
-  ArrowRight,
   Shield,
   Lock as LockIcon,
   Eye,
   EyeOff,
 } from "lucide-react";
+import { registerUser } from "@/actions/server/auth";
+import Swal from "sweetalert2";
+import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -21,14 +23,36 @@ export default function RegisterPage() {
     register,
     handleSubmit,
     watch,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm();
+  const router = useRouter();
 
   const password = watch("password");
 
-  const handleRegister = (data) => {
-    console.log("Register data:", data);
-    // Add register logic here
+  const handleRegister = async (data) => {
+    try {
+      const res = await registerUser(data);
+      if (res.success) {
+        await Swal.fire({
+          title: "Registration Successful!",
+          text: "Welcome to the community. You can now log in.",
+          icon: "success",
+        });
+        router.push("/login");
+      } else {
+        Swal.fire({
+          title: "Registration Failed",
+          text: res.message || "Something went wrong. Please try again.",
+          icon: "error",
+        });
+      }
+    } catch (error) {
+      Swal.fire({
+        title: "Error",
+        text: "An unexpected error occurred. Please try again later.",
+        icon: "error",
+      });
+    }
   };
 
   return (
@@ -59,19 +83,19 @@ export default function RegisterPage() {
                   <User className="w-5 h-5 text-base-content/40" />
                 </div>
                 <input
-                  {...register("full_name", {
+                  {...register("name", {
                     required: "Full name is required",
                   })}
                   className={`block w-full pl-11 pr-4 py-3 bg-base-200/50 border ${
-                    errors.full_name ? "border-error" : "border-base-300"
+                    errors.name ? "border-error" : "border-base-300"
                   } rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-base-content`}
                   placeholder="Enter your full name"
                   type="text"
                 />
               </div>
-              {errors.full_name && (
+              {errors.name && (
                 <p className="text-error text-xs mt-1 font-medium">
-                  {errors.full_name.message}
+                  {errors.name.message}
                 </p>
               )}
             </div>
@@ -193,11 +217,18 @@ export default function RegisterPage() {
             </div>
             <div className="pt-2">
               <button
-                className="w-full bg-primary text-primary-content font-semibold py-4 rounded-lg shadow-md hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                className="w-full bg-primary text-primary-content font-semibold py-4 rounded-lg shadow-md hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 type="submit"
+                disabled={isSubmitting}
               >
-                Create Account
-                <ArrowRight className="w-5 h-5" />
+                {isSubmitting ? (
+                  <>
+                    <span className="loading loading-spinner loading-sm"></span>
+                    Creating Account...
+                  </>
+                ) : (
+                  "Create Account"
+                )}
               </button>
             </div>
           </form>
