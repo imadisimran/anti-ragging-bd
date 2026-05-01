@@ -21,7 +21,7 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm();
 
-  const onSubmit = (data) => {
+  const handleLogin = (data) => {
     console.log("Login data:", data);
     // Add login logic here
   };
@@ -42,7 +42,7 @@ export default function LoginPage() {
               Log in to your account to continue.
             </p>
           </div>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleSubmit(handleLogin)} className="space-y-6">
             <div>
               <label
                 className="block text-sm font-semibold text-base-content/70 mb-2 uppercase tracking-wider"

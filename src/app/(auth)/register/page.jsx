@@ -26,7 +26,7 @@ export default function RegisterPage() {
 
   const password = watch("password");
 
-  const onSubmit = (data) => {
+  const handleRegister = (data) => {
     console.log("Register data:", data);
     // Add register logic here
   };
@@ -47,7 +47,7 @@ export default function RegisterPage() {
               Your safe space for reporting and stopping ragging incidents.
             </p>
           </div>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleSubmit(handleRegister)} className="space-y-6">
             <div>
               <label
                 className="block text-sm font-semibold text-base-content/70 mb-2 uppercase tracking-wider"
