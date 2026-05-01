@@ -15,6 +15,7 @@ import {
 import { registerUser } from "@/actions/server/auth";
 import Swal from "sweetalert2";
 import { useRouter } from "next/navigation";
+import SocialLogin from "@/components/auth/SocialLogin";
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -232,6 +233,9 @@ export default function RegisterPage() {
               </button>
             </div>
           </form>
+          <div className="mt-6">
+            <SocialLogin />
+          </div>
           <div className="mt-8 pt-8 border-t border-base-200 text-center">
             <p className="text-sm text-base-content/70">
               Already have an account?{" "}

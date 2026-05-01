@@ -29,6 +29,7 @@ export const registerUser = async (data) => {
       createdAt: new Date(),
       role: "student",
       userId,
+      provider:"credentials"
     };
     const result = await dbConnect(collections.USERS).insertOne(newUser);
     return {
@@ -72,3 +73,45 @@ export const loginUser = async (data) => {
     return { success: false, message: "Something went wrong" };
   }
 };
+
+export const saveSocialUser = async (data) => {
+  const { name, email, image,provider } = data;
+  if (!name || !email || !image || !provider) {
+    return { success: false, message: "All fields are required" };
+  }
+  try {
+    const emailSearchHash = generateBlindIndex(email);
+    const user = await dbConnect(collections.USERS).findOne({
+      emailSearchHash,
+    });
+    if (user) {
+      return { success: true, message: "User already exists",user };
+    }
+    const encryptedName = encryptData(name);
+    const encryptedEmail = encryptData(email);
+    const userId = `U${nanoid(10)}`;
+    const newUser = {
+      name: encryptedName,
+      email: encryptedEmail,
+      image,
+      emailSearchHash,
+      createdAt: new Date(),
+      role: "student",
+      userId,
+      provider
+    };
+    const result = await dbConnect(collections.USERS).insertOne(newUser);
+    if (result.acknowledged) {
+      return { 
+        success: true,
+        message: "User registered successfully", 
+        user: newUser
+      };
+    }
+    
+    return { success: false, message: "Failed to register user" };
+  } catch (error) {
+    console.log(error);
+    return { success: false, message: "Something went wrong" };
+  }
+}

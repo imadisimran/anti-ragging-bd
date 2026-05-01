@@ -15,6 +15,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import Swal from "sweetalert2";
+import SocialLogin from "@/components/auth/SocialLogin";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -170,6 +171,9 @@ export default function LoginPage() {
               </button>
             </div>
           </form>
+          <div className="mt-6">
+            <SocialLogin />
+          </div>
           <div className="mt-8 pt-8 border-t border-base-200 text-center">
             <p className="text-sm text-base-content/70">
               Don't have an account?{" "}

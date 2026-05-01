@@ -1,8 +1,8 @@
-import { loginUser } from "@/actions/server/auth";
+import { loginUser, saveSocialUser } from "@/actions/server/auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { decryptData } from "./encryption";
+import GoogleProvider from "next-auth/providers/google";
 export const authOptions = {
-  // Configure one or more authentication providers
   providers: [
     CredentialsProvider({
       async authorize(credentials, req) {
@@ -19,24 +19,36 @@ export const authOptions = {
         return null;
       },
     }),
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    }),
   ],
   callbacks: {
     async signIn({ user, account, profile, email, credentials }) {
       return true;
     },
-    // async redirect({ url, baseUrl }) {
-    //     console.log("redirect",{ url, baseUrl });
-    //   return baseUrl;
-    // },
     async session({ session, user, token }) {
-      session.user.userId = token.userId;
-      session.user.role = token.role;
+      session.user.userId = token?.userId;
+      session.user.role = token?.role;
       return session;
     },
     async jwt({ token, user, account, profile, isNewUser }) {
-      if (user) {
-        token.userId = user.userId;
-        token.role = user.role;
+      if (account?.provider === "google") {
+        const data = {
+          name: user.name,
+          email: user.email,
+          image: user.image,
+          provider: account.provider,
+        };
+        const result = await saveSocialUser(data);
+        if (result.success) {
+          token.userId = result?.user?.userId;
+          token.role = result?.user?.role;
+        }
+      } else if (account?.provider === "credentials") {
+        token.userId = user?.userId;
+        token.role = user?.role;
       }
       return token;
     },
