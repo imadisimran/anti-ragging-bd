@@ -1,7 +1,10 @@
 "use client";
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import { signIn } from "next-auth/react"
+
 import {
   ShieldCheck,
   Mail,
@@ -11,6 +14,7 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
+import Swal from "sweetalert2";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -20,9 +24,43 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm();
 
-  const handleLogin = (data) => {
-    console.log("Login data:", data);
-    // Add login logic here
+  const router = useRouter();
+
+  const handleLogin = async (data) => {
+    try {
+      const result = await signIn("credentials", {
+        redirect: false,
+        email: data.email,
+        password: data.password,
+      });
+
+      if (result?.ok) {
+        Swal.fire({
+          title: "Login Successful!",
+          text: "Welcome back to Anti-Ragging BD.",
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+          timerProgressBar: true,
+        });
+        router.push("/");
+        // router.refresh();
+      } else {
+        Swal.fire({
+          title: "Login Failed",
+          text: result?.error || "Invalid email or password. Please try again.",
+          icon: "error",
+          confirmButtonColor: "var(--p)",
+        });
+      }
+    } catch (error) {
+      Swal.fire({
+        title: "Error",
+        text: "An unexpected error occurred. Please try again later.",
+        icon: "error",
+        confirmButtonColor: "var(--p)",
+      });
+    }
   };
 
   return (

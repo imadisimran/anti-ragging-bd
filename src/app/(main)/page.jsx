@@ -1,6 +1,10 @@
 import { Filter, MapPin, Heart } from "lucide-react";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
 
-export default function Home() {
+export default async function Home() {
+  const session = await getServerSession(authOptions);
+  console.log(session);
   return (
     <>
       <div className="max-w-2xl mx-auto space-y-6">

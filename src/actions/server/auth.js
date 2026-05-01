@@ -20,7 +20,7 @@ export const registerUser = async (data) => {
     const encryptedName = encryptData(name);
     const encryptedEmail = encryptData(email);
     const encryptedPassword = await bcrypt.hash(password, 10);
-    const userId = nanoid(10);
+    const userId = `U${nanoid(10)}`;
     const newUser = {
       name: encryptedName,
       email: encryptedEmail,
@@ -42,4 +42,33 @@ export const registerUser = async (data) => {
     return { success: false, message: "Something went wrong" };
   }
 };
-// export const loginUser = () => {};
+export const loginUser = async (data) => {
+  const { email, password } = data;
+  if (!email || !password) {
+    return { success: false, message: "All fields are required" };
+  }
+  try {
+    const emailSearchHash = generateBlindIndex(email);
+    const user = await dbConnect(collections.USERS).findOne({
+      emailSearchHash,
+    });
+    if (!user) {
+      return { success: false, message: "User not found" };
+    }
+    const isPasswordValid = await bcrypt.compare(
+      password,
+      user.password
+    );
+    if (!isPasswordValid) {
+      return { success: false, message: "Invalid password" };
+    }
+    return {
+      success: true,
+      message: "User logged in successfully",
+      user,
+    };
+  } catch (error) {
+    console.log(error);
+    return { success: false, message: "Something went wrong" };
+  }
+};
