@@ -1,8 +1,10 @@
 "use server";
+import { authOptions } from "@/lib/authOptions";
 import { collections, dbConnect } from "@/lib/dbConnect";
 import { encryptData, generateBlindIndex } from "@/lib/encryption";
 import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
+import { getServerSession } from "next-auth";
 
 export const registerUser = async (data) => {
   const { name, email, password } = data;
@@ -29,7 +31,8 @@ export const registerUser = async (data) => {
       createdAt: new Date(),
       role: "student",
       userId,
-      provider:"credentials"
+      provider: "credentials",
+      isVerified: false,
     };
     const result = await dbConnect(collections.USERS).insertOne(newUser);
     return {
@@ -56,10 +59,7 @@ export const loginUser = async (data) => {
     if (!user) {
       return { success: false, message: "User not found" };
     }
-    const isPasswordValid = await bcrypt.compare(
-      password,
-      user.password
-    );
+    const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return { success: false, message: "Invalid password" };
     }
@@ -75,9 +75,12 @@ export const loginUser = async (data) => {
 };
 
 export const saveSocialUser = async (data) => {
-  const { name, email, image,provider } = data;
+  const { name, email, image, provider, isVerified } = data;
   if (!name || !email || !image || !provider) {
     return { success: false, message: "All fields are required" };
+  }
+  if (!isVerified) {
+    return { success: false, message: "Email not verified" };
   }
   try {
     const emailSearchHash = generateBlindIndex(email);
@@ -85,7 +88,7 @@ export const saveSocialUser = async (data) => {
       emailSearchHash,
     });
     if (user) {
-      return { success: true, message: "User already exists",user };
+      return { success: true, message: "User already exists", user };
     }
     const encryptedName = encryptData(name);
     const encryptedEmail = encryptData(email);
@@ -98,20 +101,54 @@ export const saveSocialUser = async (data) => {
       createdAt: new Date(),
       role: "student",
       userId,
-      provider
+      provider,
+      isVerified,
     };
     const result = await dbConnect(collections.USERS).insertOne(newUser);
     if (result.acknowledged) {
-      return { 
+      return {
         success: true,
-        message: "User registered successfully", 
-        user: newUser
+        message: "User registered successfully",
+        user: newUser,
       };
     }
-    
+
     return { success: false, message: "Failed to register user" };
   } catch (error) {
     console.log(error);
     return { success: false, message: "Something went wrong" };
   }
-}
+};
+
+export const sendVerificationEmail = async () => {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return {
+      success: false,
+      message: "Please use the same device which used for registration",
+    };
+  }
+  // console.log("session", session);
+  const verificationToken = nanoid(20);
+  const expiresAt = new Date(Date.now() + 60 * 10 * 1000);
+  const newVerificationToken = {
+    email: session.user.email,
+    token: verificationToken,
+    expiresAt,
+  };
+  const result = await dbConnect(collections.VERIFICATION_TOKENS).insertOne(
+    newVerificationToken
+  );
+  if (result.acknowledged) {
+    return {
+      success: true,
+      message: "Verification email sent successfully",
+    };
+  }
+
+  return { success: false, message: "Failed to send verification email" };
+};
+
+// export const verifyToken=async(email,token)=>{
+
+// }

@@ -21,7 +21,8 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 export const collections = {
-  USERS: "users"
+  USERS: "users",
+  VERIFICATION_TOKENS: "verificationTokens"
 }
 
 export const dbConnect = (collectionName) => {

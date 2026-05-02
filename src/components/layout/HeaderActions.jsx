@@ -40,7 +40,7 @@ export default function HeaderActions() {
             )}
           </div>
         </label>
-        <ul tabIndex={0} className="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow-2xl bg-base-100 rounded-box w-64 border border-base-200">
+        <ul tabIndex={0} className="menu menu-sm dropdown-content mt-3 z-1 p-2 shadow-2xl bg-base-100 rounded-box w-64 border border-base-200">
           <li className="px-4 py-3 border-b border-base-200 mb-2 pointer-events-none">
             <div className="flex flex-col gap-1 p-0">
                <span className="font-bold text-base leading-none text-base-content">{user?.name || "User"}</span>

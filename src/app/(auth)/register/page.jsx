@@ -16,6 +16,7 @@ import { registerUser } from "@/actions/server/auth";
 import Swal from "sweetalert2";
 import { useRouter } from "next/navigation";
 import SocialLogin from "@/components/auth/SocialLogin";
+import { signIn } from "next-auth/react";
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -39,7 +40,14 @@ export default function RegisterPage() {
           text: "Welcome to the community. You can now log in.",
           icon: "success",
         });
-        router.push("/login");
+        const signInResult = await signIn("credentials", {
+          email: data.email,
+          password: data.password,
+          redirect: false,
+        });
+        if (signInResult?.ok) {
+          router.push("/verify-email");
+        }
       } else {
         Swal.fire({
           title: "Registration Failed",
@@ -74,9 +82,7 @@ export default function RegisterPage() {
           </div>
           <form onSubmit={handleSubmit(handleRegister)} className="space-y-6">
             <div>
-              <label
-                className="block text-sm font-semibold text-base-content/70 mb-2 uppercase tracking-wider"
-              >
+              <label className="block text-sm font-semibold text-base-content/70 mb-2 uppercase tracking-wider">
                 Full Name
               </label>
               <div className="relative">
@@ -101,9 +107,7 @@ export default function RegisterPage() {
               )}
             </div>
             <div>
-              <label
-                className="block text-sm font-semibold text-base-content/70 mb-2 uppercase tracking-wider"
-              >
+              <label className="block text-sm font-semibold text-base-content/70 mb-2 uppercase tracking-wider">
                 Email Address
               </label>
               <div className="relative">
@@ -132,9 +136,7 @@ export default function RegisterPage() {
               )}
             </div>
             <div>
-              <label
-                className="block text-sm font-semibold text-base-content/70 mb-2 uppercase tracking-wider"
-              >
+              <label className="block text-sm font-semibold text-base-content/70 mb-2 uppercase tracking-wider">
                 Password
               </label>
               <div className="relative">
@@ -177,9 +179,7 @@ export default function RegisterPage() {
               </p>
             </div>
             <div>
-              <label
-                className="block text-sm font-semibold text-base-content/70 mb-2 uppercase tracking-wider"
-              >
+              <label className="block text-sm font-semibold text-base-content/70 mb-2 uppercase tracking-wider">
                 Confirm Password
               </label>
               <div className="relative">

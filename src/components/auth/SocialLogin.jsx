@@ -3,8 +3,8 @@ import React from "react";
 import { signIn } from "next-auth/react";
 
 const SocialLogin = () => {
-  const handleGoogleLogin = () => {
-    signIn("google", { callbackUrl: "/" });
+  const handleGoogleLogin = async () => {
+    await signIn("google",{callbackUrl:"/"});
   };
 
   return (

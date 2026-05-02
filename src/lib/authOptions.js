@@ -26,6 +26,12 @@ export const authOptions = {
   ],
   callbacks: {
     async signIn({ user, account, profile, email, credentials }) {
+      if (account?.provider === "google") {
+        if (!profile?.email_verified) {
+          console.log(profile?.email_verified)
+          return false;
+        }
+      }
       return true;
     },
     async session({ session, user, token }) {
@@ -34,12 +40,14 @@ export const authOptions = {
       return session;
     },
     async jwt({ token, user, account, profile, isNewUser }) {
+      // console.log({account,token,user,profile,isNewUser})
       if (account?.provider === "google") {
         const data = {
           name: user.name,
           email: user.email,
           image: user.image,
           provider: account.provider,
+          isVerified:profile.email_verified
         };
         const result = await saveSocialUser(data);
         if (result.success) {
