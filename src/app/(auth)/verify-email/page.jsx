@@ -2,9 +2,38 @@
 import React from "react";
 import Link from "next/link";
 import { Mail, ArrowRight, ShieldCheck, RefreshCw } from "lucide-react";
-import { sendVerificationEmail } from "@/actions/server/auth";
+import { sendVerificationEmail } from "@/actions/server/email";
+import { useState } from "react";
+import Swal from "sweetalert2";
+import { useRouter } from "next/navigation";
 
 export default function VerifyEmailPage() {
+    const [sending,setSending]=useState(false)
+    const [sent,setSent]=useState(false)
+    const router=useRouter()
+    const handleEmailSent=async()=>{
+        setSending(true)
+        const result = await sendVerificationEmail()
+        if(result?.success){
+            setSent(true)
+            Swal.fire({
+                title:"Email sent successfully",
+                text: result?.message,
+                icon:"success",
+                // timer: 2000,
+                showConfirmButton: true
+            })
+            router.push("/")
+        }else{
+            Swal.fire({
+                title:"Email not sent",
+                text:result?.message || "Something went wrong",
+                icon:"error"
+            })
+        }
+        setSending(false)
+
+    }
   return (
     <div className="max-w-md w-full">
       {/* Verify Email Card */}
@@ -30,9 +59,9 @@ export default function VerifyEmailPage() {
 
             {/* Action Buttons */}
             <div className="space-y-4">
-              <button onClick={sendVerificationEmail} className="w-full bg-primary text-primary-content font-bold py-4 rounded-xl shadow-lg shadow-primary/20 hover:opacity-90 hover:-translate-y-px active:scale-[0.98] transition-all flex items-center justify-center gap-3 group cursor-pointer">
-                Verify Email
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              <button onClick={handleEmailSent} className={`w-full bg-primary text-primary-content font-bold py-4 rounded-xl shadow-lg shadow-primary/20 hover:opacity-90 hover:-translate-y-px active:scale-[0.98] transition-all flex items-center justify-center gap-3 group cursor-pointer ${sending ? "opacity-50 cursor-not-allowed" : ""}`}>
+                {sending ? <><RefreshCw className="w-4 h-4 animate-spin" />Sending...</> : <>Verify Email <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>}
+                
               </button>
 
               <div className="flex flex-col gap-3">

@@ -4,7 +4,6 @@ import { collections, dbConnect } from "@/lib/dbConnect";
 import { encryptData, generateBlindIndex } from "@/lib/encryption";
 import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
-import { getServerSession } from "next-auth";
 
 export const registerUser = async (data) => {
   const { name, email, password } = data;
@@ -118,35 +117,6 @@ export const saveSocialUser = async (data) => {
     console.log(error);
     return { success: false, message: "Something went wrong" };
   }
-};
-
-export const sendVerificationEmail = async () => {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return {
-      success: false,
-      message: "Please use the same device which used for registration",
-    };
-  }
-  // console.log("session", session);
-  const verificationToken = nanoid(20);
-  const expiresAt = new Date(Date.now() + 60 * 10 * 1000);
-  const newVerificationToken = {
-    email: session.user.email,
-    token: verificationToken,
-    expiresAt,
-  };
-  const result = await dbConnect(collections.VERIFICATION_TOKENS).insertOne(
-    newVerificationToken
-  );
-  if (result.acknowledged) {
-    return {
-      success: true,
-      message: "Verification email sent successfully",
-    };
-  }
-
-  return { success: false, message: "Failed to send verification email" };
 };
 
 // export const verifyToken=async(email,token)=>{
