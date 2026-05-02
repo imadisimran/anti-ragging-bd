@@ -6,8 +6,10 @@ import { sendVerificationEmail } from "@/actions/server/email";
 import { useState } from "react";
 import Swal from "sweetalert2";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 export default function VerifyEmailPage() {
+    console.log(useSession())
     const [sending,setSending]=useState(false)
     const [sent,setSent]=useState(false)
     const router=useRouter()

@@ -4,6 +4,7 @@ import { collections, dbConnect } from "@/lib/dbConnect";
 import { encryptData, generateBlindIndex } from "@/lib/encryption";
 import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
+import { getServerSession } from "next-auth";
 
 export const registerUser = async (data) => {
   const { name, email, password } = data;
@@ -62,6 +63,7 @@ export const loginUser = async (data) => {
     if (!isPasswordValid) {
       return { success: false, message: "Invalid password" };
     }
+    delete user.password;
     return {
       success: true,
       message: "User logged in successfully",
@@ -119,6 +121,43 @@ export const saveSocialUser = async (data) => {
   }
 };
 
-// export const verifyToken=async(email,token)=>{
+export const verifyToken=async(token)=>{
+  try {
+    const session=await getServerSession(authOptions);
+    const tokenData = await dbConnect(collections.VERIFICATION_TOKENS).findOne({
+      email:session?.user?.email,
+    });
+    if (!tokenData) {
+      return { success: false, message: "Token not found" };
+    }
+    const isTokenValid = tokenData.token===token
+    if (!isTokenValid) {
+      return { success: false, message: "Invalid token" };
+    }
+    const isTokenExpired =  new Date() > tokenData.expiresAt;
+    if (isTokenExpired) {
+      return { success: false, message: "Token expired" };
+    }
+    const emailSearchHash=generateBlindIndex(session?.user?.email);
 
-// }
+    const [updateUser,deleteToken]=await Promise.all([
+      dbConnect(collections.USERS).updateOne({
+        emailSearchHash,
+      },{
+        $set:{
+          isVerified:true,
+        }
+      }),
+      dbConnect(collections.VERIFICATION_TOKENS).deleteOne({
+        email:session?.user?.email,
+      })
+    ])
+    return {
+      success: updateUser?.acknowledged,
+      message: updateUser?.acknowledged ? "Token verified successfully" : "Failed to verify token",
+    };
+  } catch (error) {
+    console.log(error);
+    return { success: false, message: "Something went wrong" };
+  }
+}

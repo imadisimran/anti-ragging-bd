@@ -13,6 +13,7 @@ export const authOptions = {
             email: decryptData(result.user.email),
             userId: result.user.userId,
             role: result.user.role,
+            isVerified: result?.user?.isVerified,
           };
           return user;
         }
@@ -28,7 +29,7 @@ export const authOptions = {
     async signIn({ user, account, profile, email, credentials }) {
       if (account?.provider === "google") {
         if (!profile?.email_verified) {
-          console.log(profile?.email_verified)
+          console.log(profile?.email_verified);
           return false;
         }
       }
@@ -37,6 +38,7 @@ export const authOptions = {
     async session({ session, user, token }) {
       session.user.userId = token?.userId;
       session.user.role = token?.role;
+      session.user.isVerified = token?.isVerified;
       return session;
     },
     async jwt({ token, user, account, profile, isNewUser }) {
@@ -47,16 +49,18 @@ export const authOptions = {
           email: user.email,
           image: user.image,
           provider: account.provider,
-          isVerified:profile.email_verified
+          isVerified: profile.email_verified,
         };
         const result = await saveSocialUser(data);
         if (result.success) {
           token.userId = result?.user?.userId;
           token.role = result?.user?.role;
+          token.isVerified = result?.user?.isVerified;
         }
       } else if (account?.provider === "credentials") {
         token.userId = user?.userId;
         token.role = user?.role;
+        token.isVerified = user?.isVerified;
       }
       return token;
     },
