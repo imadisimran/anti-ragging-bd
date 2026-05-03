@@ -6,23 +6,20 @@ import { sendVerificationEmail } from "@/actions/server/email";
 import { useState } from "react";
 import Swal from "sweetalert2";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+// import { useSession } from "next-auth/react";
 
 export default function VerifyEmailPage() {
-    console.log(useSession())
     const [sending,setSending]=useState(false)
-    const [sent,setSent]=useState(false)
+    // console.log(useSession())
     const router=useRouter()
     const handleEmailSent=async()=>{
         setSending(true)
         const result = await sendVerificationEmail()
         if(result?.success){
-            setSent(true)
             Swal.fire({
                 title:"Email sent successfully",
                 text: result?.message,
                 icon:"success",
-                // timer: 2000,
                 showConfirmButton: true
             })
             router.push("/")
@@ -61,9 +58,12 @@ export default function VerifyEmailPage() {
 
             {/* Action Buttons */}
             <div className="space-y-4">
-              <button onClick={handleEmailSent} className={`w-full bg-primary text-primary-content font-bold py-4 rounded-xl shadow-lg shadow-primary/20 hover:opacity-90 hover:-translate-y-px active:scale-[0.98] transition-all flex items-center justify-center gap-3 group cursor-pointer ${sending ? "opacity-50 cursor-not-allowed" : ""}`}>
+              <button 
+                onClick={handleEmailSent} 
+                disabled={sending}
+                className={`w-full bg-primary text-primary-content font-bold py-4 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-3 group ${sending ? "opacity-50 cursor-not-allowed" : "hover:opacity-90 hover:-translate-y-px active:scale-[0.98] cursor-pointer"}`}
+              >
                 {sending ? <><RefreshCw className="w-4 h-4 animate-spin" />Sending...</> : <>Verify Email <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>}
-                
               </button>
 
               <div className="flex flex-col gap-3">
@@ -74,7 +74,10 @@ export default function VerifyEmailPage() {
                   Skip for now
                 </Link>
                 
-                <button className="text-sm font-medium text-primary hover:underline flex items-center justify-center gap-2 transition-all cursor-pointer">
+                <button 
+                  disabled={sending}
+                  className={`text-sm font-medium text-primary hover:underline flex items-center justify-center gap-2 transition-all ${sending ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                >
                   <RefreshCw className="w-4 h-4" />
                   Resend verification email
                 </button>

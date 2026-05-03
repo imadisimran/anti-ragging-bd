@@ -1,4 +1,4 @@
-import { loginUser, saveSocialUser } from "@/actions/server/auth";
+import { getUserInfo, loginUser, saveSocialUser } from "@/actions/server/auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { decryptData } from "./encryption";
 import GoogleProvider from "next-auth/providers/google";
@@ -13,7 +13,7 @@ export const authOptions = {
             email: decryptData(result.user.email),
             userId: result.user.userId,
             role: result.user.role,
-            isVerified: result?.user?.isVerified,
+            isVerified: result?.user?.isVerified ?? false,
           };
           return user;
         }
@@ -29,7 +29,7 @@ export const authOptions = {
     async signIn({ user, account, profile, email, credentials }) {
       if (account?.provider === "google") {
         if (!profile?.email_verified) {
-          console.log(profile?.email_verified);
+          // console.log(profile?.email_verified);
           return false;
         }
       }
@@ -41,7 +41,7 @@ export const authOptions = {
       session.user.isVerified = token?.isVerified;
       return session;
     },
-    async jwt({ token, user, account, profile, isNewUser }) {
+    async jwt({ token, user, account, profile, isNewUser, trigger }) {
       // console.log({account,token,user,profile,isNewUser})
       if (account?.provider === "google") {
         const data = {
@@ -61,6 +61,15 @@ export const authOptions = {
         token.userId = user?.userId;
         token.role = user?.role;
         token.isVerified = user?.isVerified;
+      } 
+      if (trigger === "update") {
+        // console.log("update triggered")
+        const userInfo = await getUserInfo(token.email);
+        // console.log("UserInfo Log:", { email: token.email, userInfo })
+        if (userInfo.success) {
+          token.role = userInfo?.user?.role;
+          token.isVerified = userInfo?.user?.isVerified;
+        }
       }
       return token;
     },

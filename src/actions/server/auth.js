@@ -121,43 +121,79 @@ export const saveSocialUser = async (data) => {
   }
 };
 
-export const verifyToken=async(token)=>{
+export const verifyToken = async (token) => {
   try {
-    const session=await getServerSession(authOptions);
-    const tokenData = await dbConnect(collections.VERIFICATION_TOKENS).findOne({
-      email:session?.user?.email,
-    });
+    const session = await getServerSession(authOptions);
+    const [tokenData] = await dbConnect(collections.VERIFICATION_TOKENS).find({
+      email: session?.user?.email,
+    }).sort({createdAt:-1}).limit(1).toArray();
+    // console.log(tokenData)
     if (!tokenData) {
       return { success: false, message: "Token not found" };
     }
-    const isTokenValid = tokenData.token===token
+    const isTokenValid = tokenData.token === token;
     if (!isTokenValid) {
       return { success: false, message: "Invalid token" };
     }
-    const isTokenExpired =  new Date() > tokenData.expiresAt;
+    const isTokenExpired = new Date() > tokenData.expiresAt;
     if (isTokenExpired) {
       return { success: false, message: "Token expired" };
     }
-    const emailSearchHash=generateBlindIndex(session?.user?.email);
+    const emailSearchHash = generateBlindIndex(session?.user?.email);
 
-    const [updateUser,deleteToken]=await Promise.all([
-      dbConnect(collections.USERS).updateOne({
-        emailSearchHash,
-      },{
-        $set:{
-          isVerified:true,
-        }
+    const [updateUser, deleteToken] = await Promise.all([
+      dbConnect(collections.USERS).updateOne(
+        {
+          emailSearchHash,
+        },
+        {
+          $set: {
+            isVerified: true,
+          },
+        },
+      ),
+      dbConnect(collections.VERIFICATION_TOKENS).deleteMany({
+        email: session?.user?.email,
       }),
-      dbConnect(collections.VERIFICATION_TOKENS).deleteOne({
-        email:session?.user?.email,
-      })
-    ])
+    ]);
     return {
       success: updateUser?.acknowledged,
-      message: updateUser?.acknowledged ? "Token verified successfully" : "Failed to verify token",
+      message: updateUser?.acknowledged
+        ? "Token verified successfully"
+        : "Failed to verify token",
     };
   } catch (error) {
     console.log(error);
     return { success: false, message: "Something went wrong" };
   }
-}
+};
+
+export const getUserInfo = async (email) => {
+  // console.log("getUserInfo called with email:", email);
+  if (!email) return { success: false, message: "No email provided" };
+  try {
+    const emailSearchHash = generateBlindIndex(email);
+    const user = await dbConnect(collections.USERS).findOne(
+      {
+        emailSearchHash,
+      },
+      {
+        projection: {
+          role: 1,
+          isVerified: 1,
+        },
+      },
+    );
+    if (!user) {
+      return { success: false, message: "User not found" };
+    }
+    return {
+      success: true,
+      message: "User found",
+      user,
+    };
+  } catch (error) {
+    console.log(error);
+    return { success: false, message: "Something went wrong" };
+  }
+};

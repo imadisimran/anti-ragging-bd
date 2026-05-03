@@ -5,6 +5,7 @@ import React, { useEffect, useState, Suspense } from "react";
 import Swal from "sweetalert2";
 import { Loader2, XCircle, CheckCircle2, RefreshCcw } from "lucide-react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -12,8 +13,14 @@ function VerifyEmailContent() {
   const token = searchParams.get("token");
   const [status, setStatus] = useState("verifying"); // 'verifying', 'success', 'error'
   const [message, setMessage] = useState("");
+  const { update, status: sessionStatus } = useSession();
+  const hasVerified = useRef(false);
 
   useEffect(() => {
+    if (sessionStatus === "loading") return;
+    if (hasVerified.current) return;
+    hasVerified.current = true;
+
     const handleVerify = async () => {
       if (!token) {
         setStatus("error");
@@ -21,33 +28,29 @@ function VerifyEmailContent() {
         return;
       }
 
-      try {
-        const res = await verifyToken(token);
-        if (res.success) {
-          setStatus("success");
-          setMessage(res.message);
-          Swal.fire({
-            title: "Email Verified!",
-            text: res.message,
-            icon: "success",
-            timer: 2000,
-            showConfirmButton: false,
-          });
-          setTimeout(() => {
-            router.push("/");
-          }, 2000);
-        } else {
-          setStatus("error");
-          setMessage(res.message);
-        }
-      } catch (error) {
+      const res = await verifyToken(token);
+      if (res.success) {
+        setStatus("success");
+        setMessage(res.message);
+        Swal.fire({
+          title: "Email Verified!",
+          text: res.message,
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        // console.log("update triggered");
+        await update({ force: true });
+        router.refresh();
+        router.push("/");
+      } else {
         setStatus("error");
-        setMessage("An unexpected error occurred. Please try again.");
+        setMessage(res.message);
       }
     };
 
     handleVerify();
-  }, [token, router]);
+  }, [token, router, sessionStatus, update]);
 
   return (
     <div className="flex flex-col items-center justify-center p-8 text-center bg-base-100 rounded-2xl shadow-xl border border-base-200 max-w-md w-full mx-auto">

@@ -23,6 +23,7 @@ export const sendVerificationEmail = async () => {
       email: session.user.email,
       token: verificationToken,
       expiresAt,
+      createdAt:new Date()
     };
 
     const result = await dbConnect(collections.VERIFICATION_TOKENS).insertOne(
