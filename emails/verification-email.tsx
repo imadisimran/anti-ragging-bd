@@ -12,12 +12,16 @@ import {
   Tailwind,
   Text,
 } from '@react-email/components';
-import * as React from 'react';
+
+interface VerificationEmailProps {
+  name: string;
+  verificationUrl: string;
+}
 
 export const VerificationEmail = ({
   name,
   verificationUrl,
-}) => {
+}:VerificationEmailProps) => {
   const previewText = `Verify your email address for Anti-Ragging BD`;
 
   return (

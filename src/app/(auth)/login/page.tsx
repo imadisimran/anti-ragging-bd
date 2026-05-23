@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { SubmitHandler, useForm } from "react-hook-form";
 import { signIn } from "next-auth/react"
 
 import {
@@ -17,17 +17,23 @@ import {
 import Swal from "sweetalert2";
 import SocialLogin from "@/components/auth/SocialLogin";
 
+interface LoginData {
+  email: string;
+  password: string;
+}
+
+
 export default function LoginPage() {
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm();
+  } = useForm<LoginData>();
 
   const router = useRouter();
 
-  const handleLogin = async (data) => {
+  const handleLogin: SubmitHandler<LoginData> = async (data) => {
     try {
       const result = await signIn("credentials", {
         redirect: false,
@@ -99,9 +105,8 @@ export default function LoginPage() {
                       message: "Invalid email address",
                     },
                   })}
-                  className={`block w-full pl-11 pr-4 py-3 bg-base-200/50 border ${
-                    errors.email ? "border-error" : "border-base-300"
-                  } rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-base-content`}
+                  className={`block w-full pl-11 pr-4 py-3 bg-base-200/50 border ${errors.email ? "border-error" : "border-base-300"
+                    } rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-base-content`}
                   placeholder="name@university.edu"
                   type="email"
                 />
@@ -130,9 +135,8 @@ export default function LoginPage() {
                       message: "Password must be at least 8 characters",
                     },
                   })}
-                  className={`block w-full pl-11 pr-12 py-3 bg-base-200/50 border ${
-                    errors.password ? "border-error" : "border-base-300"
-                  } rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-base-content`}
+                  className={`block w-full pl-11 pr-12 py-3 bg-base-200/50 border ${errors.password ? "border-error" : "border-base-300"
+                    } rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-base-content`}
                   placeholder="••••••••"
                   type={showPassword ? "text" : "password"}
                 />

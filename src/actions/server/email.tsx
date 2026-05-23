@@ -10,7 +10,7 @@ import VerificationEmail from "../../../emails/verification-email";
 export const sendVerificationEmail = async () => {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
+    if (!session || !session.user || !session.user.email) {
       return {
         success: false,
         message: "Please use the same device which used for registration",
@@ -36,7 +36,7 @@ export const sendVerificationEmail = async () => {
 
     const emailHtml = await render(
       <VerificationEmail
-        name={session.user.name}
+        name={session.user.name ?? ""}
         verificationUrl={`${process.env.NEXT_PUBLIC_BASE_URL}/verify-email/verify?token=${verificationToken}`}
       />
     );

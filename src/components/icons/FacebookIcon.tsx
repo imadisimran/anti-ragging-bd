@@ -1,6 +1,8 @@
-import React from "react";
+export interface Props {
+  className:string;
+}
 
-export const FacebookIcon = (props) => (
+export const FacebookIcon = (props:Props) => (
   <svg
     {...props}
     xmlns="http://www.w3.org/2000/svg"

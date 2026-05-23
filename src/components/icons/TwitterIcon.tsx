@@ -1,6 +1,6 @@
-import React from "react";
+import { Props } from "./FacebookIcon";
 
-export const TwitterIcon = (props) => (
+export const TwitterIcon = (props: Props) => (
   <svg
     {...props}
     xmlns="http://www.w3.org/2000/svg"

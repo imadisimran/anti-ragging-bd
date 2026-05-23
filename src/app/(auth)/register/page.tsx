@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
+import { SubmitHandler, useForm } from "react-hook-form";
 import {
   ShieldCheck,
   User,
@@ -18,20 +18,27 @@ import { useRouter } from "next/navigation";
 import SocialLogin from "@/components/auth/SocialLogin";
 import { signIn } from "next-auth/react";
 
+interface RegisterData {
+  name: string;
+  email: string;
+  password: string;
+  confirm_password:string;
+}
+
 export default function RegisterPage() {
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
   const {
     register,
     handleSubmit,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm();
+  } = useForm<RegisterData>();
   const router = useRouter();
 
   const password = watch("password");
 
-  const handleRegister = async (data) => {
+  const handleRegister: SubmitHandler<RegisterData> = async (data) => {
     try {
       const res = await registerUser(data);
       if (res.success) {

@@ -2,7 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 
-export default function AuthLayout({ children }) {
+export default function AuthLayout({ children }:{children:React.ReactNode}) {
   return (
     <div className="min-h-screen bg-base-200 flex flex-col antialiased">
       <div className="p-6 fixed top-0 left-0 z-50">

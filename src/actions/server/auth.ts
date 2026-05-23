@@ -3,10 +3,59 @@ import { authOptions } from "@/lib/authOptions";
 import { collections, dbConnect } from "@/lib/dbConnect";
 import { encryptData, generateBlindIndex } from "@/lib/encryption";
 import bcrypt from "bcryptjs";
+import { ObjectId, WithId } from "mongodb";
 import { nanoid } from "nanoid";
 import { getServerSession } from "next-auth";
 
-export const registerUser = async (data) => {
+interface RegisterUser {
+  name: string;
+  email: string;
+  password: string;
+}
+interface NewUser {
+  name: string;
+  email: string;
+  password: string;
+  emailSearchHash: string;
+  createdAt: Date;
+  role: string;
+  userId: string;
+  provider: string;
+  isVerified: boolean;
+}
+
+interface LoginUser {
+  email: string;
+  password: string;
+}
+
+interface RegisterUserReturn {
+  success: boolean;
+  message: string;
+}
+
+
+interface DBuser {
+  _id: ObjectId;
+  name: string;
+  email: string;
+  emailSearchHash: string;
+  createdAt: Date;
+  role: string;
+  userId: string;
+  provider: string;
+  isVerified: boolean;
+  password?: string;
+}
+
+interface LoginUserReturn {
+  success: boolean;
+  message: string;
+  user?: DBuser
+}
+
+
+export const registerUser = async (data: RegisterUser): Promise<RegisterUserReturn> => {
   const { name, email, password } = data;
   if (!name || !email || !password) {
     return { success: false, message: "All fields are required" };
@@ -23,7 +72,7 @@ export const registerUser = async (data) => {
     const encryptedEmail = encryptData(email);
     const encryptedPassword = await bcrypt.hash(password, 10);
     const userId = `U${nanoid(10)}`;
-    const newUser = {
+    const newUser: NewUser = {
       name: encryptedName,
       email: encryptedEmail,
       password: encryptedPassword,
@@ -46,7 +95,7 @@ export const registerUser = async (data) => {
     return { success: false, message: "Something went wrong" };
   }
 };
-export const loginUser = async (data) => {
+export const loginUser = async (data: LoginUser): Promise<LoginUserReturn> => {
   const { email, password } = data;
   if (!email || !password) {
     return { success: false, message: "All fields are required" };
@@ -55,11 +104,11 @@ export const loginUser = async (data) => {
     const emailSearchHash = generateBlindIndex(email);
     const user = await dbConnect(collections.USERS).findOne({
       emailSearchHash,
-    });
+    }) as DBuser | null;
     if (!user) {
       return { success: false, message: "User not found" };
     }
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await bcrypt.compare(password, user?.password || "");
     if (!isPasswordValid) {
       return { success: false, message: "Invalid password" };
     }
@@ -75,9 +124,33 @@ export const loginUser = async (data) => {
   }
 };
 
-export const saveSocialUser = async (data) => {
-  const { name, email, image, provider, isVerified } = data;
-  if (!name || !email || !image || !provider) {
+interface SocialData {
+  name: string;
+  email: string;
+  provider: string;
+  isVerified: boolean;
+}
+
+interface SocialUser {
+  name: string;
+  email: string;
+  emailSearchHash: string;
+  createdAt: Date;
+  role: string;
+  userId: string;
+  provider: string;
+  isVerified: boolean;
+}
+
+interface SocialReturn {
+  success: boolean;
+  message: string;
+  user?: (SocialUser & { _id: ObjectId });
+}
+
+export const saveSocialUser = async (data: SocialData): Promise<SocialReturn> => {
+  const { name, email, provider, isVerified } = data;
+  if (!name || !email || !provider) {
     return { success: false, message: "All fields are required" };
   }
   if (!isVerified) {
@@ -87,17 +160,16 @@ export const saveSocialUser = async (data) => {
     const emailSearchHash = generateBlindIndex(email);
     const user = await dbConnect(collections.USERS).findOne({
       emailSearchHash,
-    });
+    }) as (SocialUser & { _id: ObjectId }) | null;
     if (user) {
       return { success: true, message: "User already exists", user };
     }
     const encryptedName = encryptData(name);
     const encryptedEmail = encryptData(email);
     const userId = `U${nanoid(10)}`;
-    const newUser = {
+    const newUser: SocialUser = {
       name: encryptedName,
       email: encryptedEmail,
-      image,
       emailSearchHash,
       createdAt: new Date(),
       role: "student",
@@ -110,7 +182,7 @@ export const saveSocialUser = async (data) => {
       return {
         success: true,
         message: "User registered successfully",
-        user: newUser,
+        user: { ...newUser, _id: result.insertedId },
       };
     }
 
@@ -121,12 +193,24 @@ export const saveSocialUser = async (data) => {
   }
 };
 
-export const verifyToken = async (token) => {
+interface TokenData {
+  email: string;
+  token: string;
+  expiresAt: Date;
+  createdAt: Date;
+}
+
+interface VerifyTokenReturn {
+  success: boolean;
+  message: string;
+}
+
+export const verifyToken = async (token: string): Promise<VerifyTokenReturn> => {
   try {
     const session = await getServerSession(authOptions);
     const [tokenData] = await dbConnect(collections.VERIFICATION_TOKENS).find({
       email: session?.user?.email,
-    }).sort({createdAt:-1}).limit(1).toArray();
+    }).sort({ createdAt: -1 }).limit(1).toArray() as (TokenData & { _id: ObjectId })[];
     // console.log(tokenData)
     if (!tokenData) {
       return { success: false, message: "Token not found" };
@@ -139,9 +223,9 @@ export const verifyToken = async (token) => {
     if (isTokenExpired) {
       return { success: false, message: "Token expired" };
     }
-    const emailSearchHash = generateBlindIndex(session?.user?.email);
+    const emailSearchHash = generateBlindIndex(session?.user?.email || "");
 
-    const [updateUser, deleteToken] = await Promise.all([
+    const [updateUser] = await Promise.all([
       dbConnect(collections.USERS).updateOne(
         {
           emailSearchHash,
@@ -168,7 +252,22 @@ export const verifyToken = async (token) => {
   }
 };
 
-export const getUserInfo = async (email) => {
+interface GetUserInfo {
+  success: boolean;
+  message: string;
+  user?: {
+    role: string;
+    isVerified: boolean;
+  };
+}
+
+interface UserInfoDB {
+  role: string;
+  isVerified: boolean;
+  _id: ObjectId;
+}
+
+export const getUserInfo = async (email: string): Promise<GetUserInfo> => {
   // console.log("getUserInfo called with email:", email);
   if (!email) return { success: false, message: "No email provided" };
   try {
@@ -183,7 +282,7 @@ export const getUserInfo = async (email) => {
           isVerified: 1,
         },
       },
-    );
+    ) as UserInfoDB | null;
     if (!user) {
       return { success: false, message: "User not found" };
     }
