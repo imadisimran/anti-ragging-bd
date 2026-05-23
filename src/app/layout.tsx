@@ -17,9 +17,9 @@ export default function RootLayout({ children }:{children:React.ReactNode}) {
     <html
       lang="en"
       className={`${inter.variable} h-full antialiased`}
-      data-theme="winter"
+      data-theme="justice-safety"
     >
-      <body className="min-h-full flex flex-col bg-base-100 text-base-content"><AuthProvider>{children}</AuthProvider></body>
+      <body className="min-h-full flex flex-col bg-background text-on-background"><AuthProvider>{children}</AuthProvider></body>
     </html>
   );
 }
