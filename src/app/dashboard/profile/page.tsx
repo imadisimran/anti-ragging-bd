@@ -1,6 +1,4 @@
 "use client";
-
-import React from "react";
 import { 
   BadgeCheck, 
   Lock, 
@@ -9,8 +7,10 @@ import {
   AlertTriangle, 
   Trash2 
 } from "lucide-react";
+import { Role } from "../types";
 
 export default function ProfilePage() {
+  const role:Role=Role.STUDENT;
   return (
     <div className="space-y-gutter">
       
