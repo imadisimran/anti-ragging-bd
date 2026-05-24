@@ -1,8 +1,10 @@
 import React from "react";
-import { Mail, Phone, ShieldCheck } from "lucide-react";
+import { Mail, Phone } from "lucide-react";
 import { FacebookIcon } from "../icons/FacebookIcon";
 import { TwitterIcon } from "../icons/TwitterIcon";
 import { InstagramIcon } from "../icons/InstagramIcon";
+import Image from "next/image";
+import Link from "next/link";
 
 export const Footer = () => {
   return (
@@ -10,14 +12,18 @@ export const Footer = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 px-10">
         {/* Brand Section */}
         <div className="space-y-6">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-primary-content shadow-lg shadow-primary/20">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
+          <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+            <Image
+              src="/logo.png"
+              alt="Anti-Ragging BD Logo"
+              width={36}
+              height={36}
+              className="w-9 h-9 object-contain rounded-md"
+            />
             <span className="text-xl font-black tracking-tighter text-primary">
               Anti-Ragging BD
             </span>
-          </div>
+          </Link>
           <p className="text-sm text-base-content/60 leading-relaxed">
             We are committed to creating a safe and inclusive campus
             environment for every student. Report incidents anonymously and

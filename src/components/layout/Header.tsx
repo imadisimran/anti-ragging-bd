@@ -1,10 +1,12 @@
 import React from "react";
 import { Menu, Search } from "lucide-react";
 import HeaderActions from "./HeaderActions";
+import Image from "next/image";
+import Link from "next/link";
 
 export const Header = () => {
   return (
-    <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-4 md:px-margin-desktop h-16 bg-surface-container-lowest border-b border-outline-variant">
+    <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-4 md:px-margin-desktop h-20 bg-surface-container-lowest border-b border-outline-variant">
       <div className="flex items-center gap-4 lg:gap-8">
         <button 
           className="md:hidden p-1 text-on-surface hover:text-secondary transition-colors cursor-pointer" 
@@ -30,9 +32,18 @@ export const Header = () => {
         >
           <Menu className="w-6 h-6" />
         </button>
-        <span className="text-headline-sm md:text-headline-md font-extrabold text-primary truncate max-w-[200px] md:max-w-none">
-          Anti-Ragging Bangladesh
-        </span>
+        <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+          <Image
+            src="/logo.png"
+            alt="Anti-Ragging Bangladesh Logo"
+            width={100}
+            height={100}
+            className="w-18 h-18 object-contain rounded-md"
+          />
+          <span className="text-headline-sm md:text-headline-md font-extrabold text-primary truncate max-w-[180px] md:max-w-none">
+            
+          </span>
+        </Link>
         <div className="relative hidden xl:block w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant w-4 h-4" />
           <input
