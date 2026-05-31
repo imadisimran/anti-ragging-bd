@@ -31,13 +31,15 @@ if (process.env.NODE_ENV === 'development') {
 interface Collections {
   USERS: string;
   VERIFICATION_TOKENS: string;
-  UNIVERSITIES: string
+  UNIVERSITIES: string;
+  REPORTS: string;
 }
 
 export const collections: Collections = {
   USERS: "users",
   VERIFICATION_TOKENS: "verificationTokens",
-  UNIVERSITIES: "universities"
+  UNIVERSITIES: "universities",
+  REPORTS:"reports"
 }
 
 export const dbConnect = (collectionName: string) => {

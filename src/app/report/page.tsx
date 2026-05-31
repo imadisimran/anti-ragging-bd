@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { CloudUpload } from "lucide-react";
-import { getLocation } from "@/actions/server/reportForm";
+import { getLocation, postReport } from "@/actions/server/reportForm";
 
 interface ReportFormInputs {
   university: string;
@@ -53,7 +53,7 @@ export default function ReportPage() {
   }, [university, locationCategory]);
 
 
-  const handlePostReport = (data: ReportFormInputs) => {
+  const handlePostReport = async(data: ReportFormInputs) => {
     const formData = new FormData();
     formData.append("university", data.university);
     formData.append("dateTime", new Date(data.dateTime).toISOString());
@@ -68,7 +68,8 @@ export default function ReportPage() {
       });
     }
     
-    console.log("Form Data Submitted (entries):", Object.fromEntries(formData.entries()));
+    const result = await postReport(formData)
+    
   };
 
   return (
