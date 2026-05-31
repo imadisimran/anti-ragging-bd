@@ -1,59 +1,24 @@
 "use server";
+
 import { authOptions } from "@/lib/authOptions";
 import { collections, dbConnect } from "@/lib/dbConnect";
 import { encryptData, generateBlindIndex } from "@/lib/encryption";
 import bcrypt from "bcryptjs";
-import { ObjectId, WithId } from "mongodb";
 import { nanoid } from "nanoid";
 import { getServerSession } from "next-auth";
-
-interface RegisterUser {
-  name: string;
-  email: string;
-  password: string;
-}
-interface NewUser {
-  name: string;
-  email: string;
-  password: string;
-  emailSearchHash: string;
-  createdAt: Date;
-  role: string;
-  userId: string;
-  provider: string;
-  isVerified: boolean;
-}
-
-interface LoginUser {
-  email: string;
-  password: string;
-}
-
-interface RegisterUserReturn {
-  success: boolean;
-  message: string;
-}
-
-
-interface DBuser {
-  _id: ObjectId;
-  name: string;
-  email: string;
-  emailSearchHash: string;
-  createdAt: Date;
-  role: string;
-  userId: string;
-  provider: string;
-  isVerified: boolean;
-  password?: string;
-}
-
-interface LoginUserReturn {
-  success: boolean;
-  message: string;
-  user?: DBuser
-}
-
+import {
+  RegisterUser,
+  NewUser,
+  LoginUser,
+  RegisterUserReturn,
+  DBuser,
+  LoginUserReturn,
+  SocialData,
+  SocialUser,
+  SocialReturn,
+  VerifyTokenReturn,
+  GetUserInfo,
+} from "@/types/auth.type";
 
 export const registerUser = async (data: RegisterUser): Promise<RegisterUserReturn> => {
   const { name, email, password } = data;
@@ -72,6 +37,7 @@ export const registerUser = async (data: RegisterUser): Promise<RegisterUserRetu
     const encryptedEmail = encryptData(email);
     const encryptedPassword = await bcrypt.hash(password, 10);
     const userId = `U${nanoid(10)}`;
+    
     const newUser: NewUser = {
       name: encryptedName,
       email: encryptedEmail,
@@ -83,6 +49,7 @@ export const registerUser = async (data: RegisterUser): Promise<RegisterUserRetu
       provider: "credentials",
       isVerified: false,
     };
+    
     const result = await dbConnect(collections.USERS).insertOne(newUser);
     return {
       success: result.acknowledged,
@@ -91,10 +58,11 @@ export const registerUser = async (data: RegisterUser): Promise<RegisterUserRetu
         : "Failed to register user",
     };
   } catch (error) {
-    console.log(error);
+    console.error(error);
     return { success: false, message: "Something went wrong" };
   }
 };
+
 export const loginUser = async (data: LoginUser): Promise<LoginUserReturn> => {
   const { email, password } = data;
   if (!email || !password) {
@@ -102,51 +70,41 @@ export const loginUser = async (data: LoginUser): Promise<LoginUserReturn> => {
   }
   try {
     const emailSearchHash = generateBlindIndex(email);
-    const user = await dbConnect(collections.USERS).findOne({
+    const rawUser = await dbConnect(collections.USERS).findOne({
       emailSearchHash,
-    }) as DBuser | null;
-    if (!user) {
+    });
+    if (!rawUser) {
       return { success: false, message: "User not found" };
     }
-    const isPasswordValid = await bcrypt.compare(password, user?.password || "");
+
+    const isPasswordValid = await bcrypt.compare(password, rawUser?.password || "");
     if (!isPasswordValid) {
       return { success: false, message: "Invalid password" };
     }
-    delete user.password;
+
+    const sanitizedUser: DBuser = {
+      _id: rawUser._id.toString(),
+      name: rawUser.name,
+      email: rawUser.email,
+      emailSearchHash: rawUser.emailSearchHash,
+      createdAt: rawUser.createdAt,
+      role: rawUser.role,
+      userId: rawUser.userId,
+      provider: rawUser.provider,
+      isVerified: rawUser.isVerified,
+      password: rawUser.password,
+    };
+
     return {
       success: true,
       message: "User logged in successfully",
-      user,
+      user: sanitizedUser,
     };
   } catch (error) {
-    console.log(error);
+    console.error(error);
     return { success: false, message: "Something went wrong" };
   }
 };
-
-interface SocialData {
-  name: string;
-  email: string;
-  provider: string;
-  isVerified: boolean;
-}
-
-interface SocialUser {
-  name: string;
-  email: string;
-  emailSearchHash: string;
-  createdAt: Date;
-  role: string;
-  userId: string;
-  provider: string;
-  isVerified: boolean;
-}
-
-interface SocialReturn {
-  success: boolean;
-  message: string;
-  user?: (SocialUser & { _id: ObjectId });
-}
 
 export const saveSocialUser = async (data: SocialData): Promise<SocialReturn> => {
   const { name, email, provider, isVerified } = data;
@@ -158,12 +116,28 @@ export const saveSocialUser = async (data: SocialData): Promise<SocialReturn> =>
   }
   try {
     const emailSearchHash = generateBlindIndex(email);
-    const user = await dbConnect(collections.USERS).findOne({
+    const rawUser = await dbConnect(collections.USERS).findOne({
       emailSearchHash,
-    }) as (SocialUser & { _id: ObjectId }) | null;
-    if (user) {
-      return { success: true, message: "User already exists", user };
+    });
+
+    if (rawUser) {
+      return {
+        success: true,
+        message: "User already exists",
+        user: {
+          name: rawUser.name,
+          email: rawUser.email,
+          emailSearchHash: rawUser.emailSearchHash,
+          createdAt: rawUser.createdAt,
+          role: rawUser.role,
+          userId: rawUser.userId,
+          provider: rawUser.provider,
+          isVerified: rawUser.isVerified,
+          _id: rawUser._id.toString(),
+        },
+      };
     }
+
     const encryptedName = encryptData(name);
     const encryptedEmail = encryptData(email);
     const userId = `U${nanoid(10)}`;
@@ -177,122 +151,98 @@ export const saveSocialUser = async (data: SocialData): Promise<SocialReturn> =>
       provider,
       isVerified,
     };
+    
     const result = await dbConnect(collections.USERS).insertOne(newUser);
     if (result.acknowledged) {
       return {
         success: true,
         message: "User registered successfully",
-        user: { ...newUser, _id: result.insertedId },
+        user: { ...newUser, _id: result.insertedId.toString() },
       };
     }
 
     return { success: false, message: "Failed to register user" };
   } catch (error) {
-    console.log(error);
+    console.error(error);
     return { success: false, message: "Something went wrong" };
   }
 };
 
-interface TokenData {
-  email: string;
-  token: string;
-  expiresAt: Date;
-  createdAt: Date;
-}
-
-interface VerifyTokenReturn {
-  success: boolean;
-  message: string;
-}
-
 export const verifyToken = async (token: string): Promise<VerifyTokenReturn> => {
   try {
     const session = await getServerSession(authOptions);
-    const [tokenData] = await dbConnect(collections.VERIFICATION_TOKENS).find({
-      email: session?.user?.email,
-    }).sort({ createdAt: -1 }).limit(1).toArray() as (TokenData & { _id: ObjectId })[];
-    // console.log(tokenData)
-    if (!tokenData) {
+    const sessionEmail = session?.user?.email;
+    
+    if (!sessionEmail) {
+      return { success: false, message: "Unauthorized or missing email session" };
+    }
+
+    const tokens = await dbConnect(collections.VERIFICATION_TOKENS)
+      .find({ email: sessionEmail })
+      .sort({ createdAt: -1 })
+      .limit(1)
+      .toArray();
+
+    const rawTokenData = tokens[0];
+    if (!rawTokenData) {
       return { success: false, message: "Token not found" };
     }
-    const isTokenValid = tokenData.token === token;
+    const isTokenValid = rawTokenData.token === token;
     if (!isTokenValid) {
       return { success: false, message: "Invalid token" };
     }
-    const isTokenExpired = new Date() > tokenData.expiresAt;
+    const isTokenExpired = new Date() > rawTokenData.expiresAt;
     if (isTokenExpired) {
       return { success: false, message: "Token expired" };
     }
-    const emailSearchHash = generateBlindIndex(session?.user?.email || "");
+    
+    const emailSearchHash = generateBlindIndex(sessionEmail);
 
     const [updateUser] = await Promise.all([
       dbConnect(collections.USERS).updateOne(
-        {
-          emailSearchHash,
-        },
-        {
-          $set: {
-            isVerified: true,
-          },
-        },
+        { emailSearchHash },
+        { $set: { isVerified: true } },
       ),
       dbConnect(collections.VERIFICATION_TOKENS).deleteMany({
-        email: session?.user?.email,
+        email: sessionEmail,
       }),
     ]);
+    
     return {
-      success: updateUser?.acknowledged,
+      success: !!updateUser?.acknowledged,
       message: updateUser?.acknowledged
         ? "Token verified successfully"
         : "Failed to verify token",
     };
   } catch (error) {
-    console.log(error);
+    console.error(error);
     return { success: false, message: "Something went wrong" };
   }
 };
 
-interface GetUserInfo {
-  success: boolean;
-  message: string;
-  user?: {
-    role: string;
-    isVerified: boolean;
-  };
-}
-
-interface UserInfoDB {
-  role: string;
-  isVerified: boolean;
-  _id: ObjectId;
-}
-
 export const getUserInfo = async (email: string): Promise<GetUserInfo> => {
-  // console.log("getUserInfo called with email:", email);
   if (!email) return { success: false, message: "No email provided" };
   try {
     const emailSearchHash = generateBlindIndex(email);
-    const user = await dbConnect(collections.USERS).findOne(
-      {
-        emailSearchHash,
-      },
-      {
-        projection: {
-          role: 1,
-          isVerified: 1,
-        },
-      },
-    ) as UserInfoDB | null;
-    if (!user) {
+    const rawUser = await dbConnect(collections.USERS).findOne(
+      { emailSearchHash },
+      { projection: { role: 1, isVerified: 1 } }
+    );
+    
+    if (!rawUser) {
       return { success: false, message: "User not found" };
     }
+
     return {
       success: true,
       message: "User found",
-      user,
+      user: {
+        role: rawUser.role,
+        isVerified: rawUser.isVerified,
+      },
     };
   } catch (error) {
-    console.log(error);
+    console.error(error);
     return { success: false, message: "Something went wrong" };
   }
 };

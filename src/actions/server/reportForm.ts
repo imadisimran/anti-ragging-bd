@@ -1,7 +1,7 @@
 "use server"
 
 import { dbConnect, collections } from "@/lib/dbConnect"
-import { GetLocation } from "@/types/api"
+import { GetLocation } from "@/types/reportForm.type"
 
 export const getLocation = async (universityName: string, category: string): Promise<GetLocation | null> => {
     if (!category) {
