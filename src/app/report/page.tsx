@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useForm, useWatch } from "react-hook-form";
-import { CloudUpload } from "lucide-react";
+import { CloudUpload, X } from "lucide-react";
 import { getLocation, postReport } from "@/actions/server/reportForm";
 
 interface ReportFormInputs {
@@ -26,6 +26,40 @@ export default function ReportPage() {
   const university = useWatch({ name: "university", control })
 
   const [specificLocations, setSpecificLocations] = useState<string[]>([]);
+  const [previews, setPreviews] = useState<{ name: string; url: string; type: string }[]>([]);
+  const watchedFiles = useWatch({ name: "proofFiles", control });
+
+  useEffect(() => {
+    if (!watchedFiles || watchedFiles.length === 0) {
+      setPreviews([]);
+      return;
+    }
+
+    const newPreviews = Array.from(watchedFiles).map((file) => {
+      return {
+        name: file.name,
+        type: file.type,
+        url: URL.createObjectURL(file),
+      };
+    });
+
+    setPreviews(newPreviews);
+
+    return () => {
+      newPreviews.forEach((preview) => URL.revokeObjectURL(preview.url));
+    };
+  }, [watchedFiles]);
+
+  const removeFile = (indexToRemove: number) => {
+    if (!watchedFiles) return;
+    const dt = new DataTransfer();
+    Array.from(watchedFiles).forEach((file, index) => {
+      if (index !== indexToRemove) {
+        dt.items.add(file);
+      }
+    });
+    setValue("proofFiles", dt.files, { shouldValidate: true });
+  };
 
   useEffect(() => {
     if (!university || !locationCategory) {
@@ -269,6 +303,52 @@ export default function ReportPage() {
             </label>
             {errors.proofFiles && (
               <p className="text-[11px] text-error font-medium mt-1">{errors.proofFiles.message}</p>
+            )}
+            {previews.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                {previews.map((preview, index) => {
+                  const isImage = preview.type.startsWith("image/");
+                  const isVideo = preview.type.startsWith("video/");
+                  const isAudio = preview.type.startsWith("audio/");
+
+                  return (
+                    <div key={index} className="relative group/preview border border-outline-variant/50 rounded-xl p-3 bg-surface-container-low flex flex-col gap-2 shadow-sm hover:shadow-md transition-all">
+                      {/* Remove Button */}
+                      <button
+                        type="button"
+                        onClick={() => removeFile(index)}
+                        className="absolute top-2 right-2 z-10 p-1 bg-surface-container-highest/80 hover:bg-error hover:text-on-error text-on-surface rounded-full shadow-sm transition-colors cursor-pointer"
+                        title="Remove file"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                      <div className="w-full aspect-video rounded-lg overflow-hidden bg-surface-container-highest flex items-center justify-center relative">
+                        {isImage && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={preview.url} alt={preview.name} className="w-full h-full object-cover" />
+                        )}
+                        {isVideo && (
+                          <video src={preview.url} className="w-full h-full object-cover" controls />
+                        )}
+                        {isAudio && (
+                          <div className="flex flex-col items-center justify-center p-4 w-full h-full gap-2">
+                            <span className="text-3xl">🎵</span>
+                            <audio src={preview.url} controls className="w-full h-8" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-label-sm font-bold text-on-surface truncate" title={preview.name}>
+                          {preview.name}
+                        </span>
+                        <span className="text-[10px] text-on-surface-variant uppercase font-medium">
+                          {preview.type.split("/")[0] || "file"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
             <p className="text-[11px] text-on-surface-variant italic">
               All uploaded files are automatically sanitized to remove metadata before encryption.
