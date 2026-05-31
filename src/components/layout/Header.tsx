@@ -1,4 +1,3 @@
-import React from "react";
 import { Menu, Search } from "lucide-react";
 import HeaderActions from "./HeaderActions";
 import Image from "next/image";
@@ -69,9 +68,9 @@ export const Header = () => {
           </a>
         </div>
         <div className="hidden md:block h-6 w-px bg-outline-variant mx-2"></div>
-        <button className="bg-primary text-on-primary px-3 md:px-4 py-2 rounded-lg text-label-sm md:text-label-md font-label-md hover:opacity-90 transition-opacity whitespace-nowrap cursor-pointer">
+        <Link href="/report" className="bg-primary text-on-primary px-3 md:px-4 py-2 rounded-lg text-label-sm md:text-label-md font-label-md hover:opacity-90 transition-opacity whitespace-nowrap cursor-pointer">
           Report Incident
-        </button>
+        </Link>
         <div className="hidden md:block h-6 w-px bg-outline-variant mx-2"></div>
         <HeaderActions />
       </nav>
