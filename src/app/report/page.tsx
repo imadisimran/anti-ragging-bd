@@ -1,9 +1,8 @@
 "use client";
-
-import React from "react";
-import { useForm } from "react-hook-form";
+import { useState, useEffect } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { CloudUpload } from "lucide-react";
-
+import { getLocation } from "@/actions/server/reportForm";
 interface ReportFormInputs {
   university: string;
   dateTime: string;
@@ -16,7 +15,43 @@ interface ReportFormInputs {
 }
 
 export default function ReportPage() {
-  const { register, handleSubmit } = useForm<ReportFormInputs>();
+  const { register, handleSubmit, control,setValue } = useForm<ReportFormInputs>({
+    defaultValues: {
+      locationCategory: "",
+      specificLocation: ""
+    }
+  }); 
+
+  const locationCategory = useWatch({ name: "locationCategory", control })
+  const university = useWatch({ name: "university", control })
+
+  const [specificLocations, setSpecificLocations] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!university || !locationCategory) {
+      setSpecificLocations([]);
+      return;
+    }
+
+    let active = true;
+    getLocation(university, locationCategory).then((data) => {
+      if (active && data) {
+        const categoryData = data[locationCategory];
+        if (Array.isArray(categoryData)) {
+          setSpecificLocations(categoryData);
+        } else {
+          setSpecificLocations([]);
+        }
+      } else if (active) {
+        setSpecificLocations([]);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [university, locationCategory]);
+
 
   const onSubmit = (data: ReportFormInputs) => {
     // No functionality needed right now, purely focus on UI/design.
@@ -35,7 +70,7 @@ export default function ReportPage() {
 
       {/* Form */}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-12" id="reportingForm">
-        
+
         {/* Section 1: Incident Information */}
         <div className="form-section-active space-y-stack-lg" id="section-1">
           <div className="flex items-center gap-3 mb-4">
@@ -50,15 +85,16 @@ export default function ReportPage() {
             <div className="space-y-2">
               <label className="text-label-md font-bold text-on-surface">University Selection</label>
               <select
-                {...register("university")}
-                className="w-full h-11 px-4 bg-white border border-outline-variant rounded-md focus:ring-2 focus:ring-secondary/20 focus:border-secondary outline-none text-body-md transition-all text-on-surface"
+                {...register("university", {
+                  onChange: () => {
+                    setValue("locationCategory", "");
+                    setValue("specificLocation", "");
+                  }
+                })}
+                className="report-select"
               >
                 <option value="">Select Institution</option>
-                <option value="du">University of Dhaka</option>
-                <option value="buet">BUET</option>
-                <option value="ju">Jahangirnagar University</option>
-                <option value="ru">Rajshahi University</option>
-                <option value="cu">Chittagong University</option>
+                <option value="University of Dhaka">University of Dhaka</option>
               </select>
             </div>
 
@@ -68,7 +104,7 @@ export default function ReportPage() {
               <input
                 type="datetime-local"
                 {...register("dateTime")}
-                className="w-full h-11 px-4 bg-white border border-outline-variant rounded-md focus:ring-2 focus:ring-secondary/20 focus:border-secondary outline-none text-body-md transition-all text-on-surface"
+                className="report-select"
               />
             </div>
 
@@ -77,7 +113,7 @@ export default function ReportPage() {
               <label className="text-label-md font-bold text-on-surface">Harassment Type</label>
               <select
                 {...register("harassmentType")}
-                className="w-full h-11 px-4 bg-white border border-outline-variant rounded-md focus:ring-2 focus:ring-secondary/20 focus:border-secondary outline-none text-body-md transition-all text-on-surface"
+                className="report-select"
               >
                 <option value="">Select Type</option>
                 <option value="physical">Physical Ragging</option>
@@ -93,12 +129,14 @@ export default function ReportPage() {
               <label className="text-label-md font-bold text-on-surface">Location Category</label>
               <select
                 {...register("locationCategory")}
-                className="w-full h-11 px-4 bg-white border border-outline-variant rounded-md focus:ring-2 focus:ring-secondary/20 focus:border-secondary outline-none text-body-md transition-all text-on-surface"
+                className="report-select"
+                disabled={!university}
               >
-                <option value="">Select Category</option>
+                <option value="" disabled>{university ? "Select Category" : "Select University First"}</option>
                 <option value="hall">Residential Hall</option>
+                <option value="hostel">Hostel</option>
                 <option value="institute">Institute</option>
-                <option value="department">Academic Department</option>
+                <option value="department">Department</option>
               </select>
             </div>
           </div>
@@ -106,27 +144,24 @@ export default function ReportPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-gutter">
             {/* Specific Location Name */}
             <div className="space-y-2">
-              <label className="text-label-md font-bold text-on-surface">Specific Location Name</label>
+              <label className="text-label-md font-bold text-on-surface">Select Specific Location</label>
               <select
                 {...register("specificLocation")}
-                className="w-full h-11 px-4 bg-white border border-outline-variant rounded-md focus:ring-2 focus:ring-secondary/20 focus:border-secondary outline-none text-body-md transition-all text-on-surface"
+                className="report-select"
+                disabled={!university || !locationCategory}
               >
-                <option value="">Select Specific Location</option>
-                {/* Residential Hall options */}
-                <option value="surja_sen">Surja Sen Hall</option>
-                <option value="zahurul_haque">Zahurul Haque Hall</option>
-                <option value="rokeya">Rokeya Hall</option>
-                <option value="fazlul_huq">Fazlul Huq Hall</option>
-                {/* Institute options */}
-                <option value="iit">IIT</option>
-                <option value="iba">IBA</option>
-                <option value="isrt">ISRT</option>
-                <option value="modern_langs">Modern Languages</option>
-                {/* Department options */}
-                <option value="cse">Computer Science</option>
-                <option value="law">Law</option>
-                <option value="physics">Physics</option>
-                <option value="ir">International Relations</option>
+                <option value="" disabled>
+                  {!university 
+                    ? "Select University First" 
+                    : locationCategory 
+                      ? `Select ${locationCategory}` 
+                      : "Select Category First"}
+                </option>
+                {specificLocations.map((l, i) => (
+                  <option value={l} key={i}>
+                    {l}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -183,40 +218,13 @@ export default function ReportPage() {
           </div>
         </div>
 
-        {/* Section 4: Verification Quiz */}
-        <div className="space-y-stack-lg border-l-4 border-outline-variant/30 pl-6" id="section-4">
-          <div className="flex items-center gap-3 mb-4">
-            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-outline-variant text-on-surface text-label-sm font-bold">
-              4
-            </span>
-            <h2 className="text-headline-sm text-primary font-bold">Verification Quiz</h2>
-          </div>
-          
-          <div className="p-6 bg-surface-container rounded-xl border border-outline-variant/50 max-w-md space-y-4">
-            <p className="text-body-md text-on-surface font-medium">
-              Please solve this simple math problem to prove you are human:
-            </p>
-            <div className="flex items-center gap-4">
-              <span className="text-headline-md font-bold text-primary px-4 py-2 bg-white rounded border border-outline-variant">
-                5 + 8 = ?
-              </span>
-              <input
-                type="text"
-                placeholder="Answer"
-                {...register("captchaAnswer")}
-                className="w-24 h-11 px-4 bg-white border border-outline-variant rounded-md focus:ring-2 focus:ring-secondary/20 focus:border-secondary outline-none text-body-md transition-all text-on-surface"
-              />
-            </div>
-          </div>
-        </div>
-
         {/* Submit Container */}
         <div className="flex justify-end pt-stack-lg border-t border-outline-variant">
           <button
             type="submit"
             className="px-8 py-3 bg-primary text-on-primary font-label-md font-bold rounded-lg hover:scale-[1.02] active:scale-95 transition-all shadow-sm cursor-pointer"
           >
-            Submit Encrypted Report
+            Submit Report
           </button>
         </div>
 

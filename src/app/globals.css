@@ -206,3 +206,8 @@
 .swal2-cancel:hover {
   background-color: var(--color-base-300) !important;
 }
+
+
+.report-select {
+  @apply w-full h-11 px-4 bg-white border border-outline-variant rounded-md focus:ring-2 focus:ring-secondary/20 focus:border-secondary outline-none text-body-md transition-all text-on-surface
+}
