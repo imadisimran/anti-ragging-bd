@@ -37,5 +37,8 @@ export interface ReportPayload {
         adminId: string,
         appealSubmittedAt: Date | null,
         adminNote: string
-    }
+    };
+    postId:string,
+    studentEmail:string,
+    userId:string
 }

@@ -4,6 +4,10 @@ import { dbConnect, collections } from "@/lib/dbConnect"
 import { AiVerificationResult, GetLocation, ReportPayload } from "@/types/reportForm.type"
 import { v2 as cloudinary } from 'cloudinary'
 import { GoogleGenAI } from "@google/genai";
+import { nanoid } from "nanoid";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
+import { generateBlindIndex } from "@/lib/encryption";
 
 export const getLocation = async (universityName: string, category: string): Promise<GetLocation | null> => {
     if (!category) {
@@ -82,6 +86,7 @@ Don't return anything except json format.
 }
 
 export const postReport = async (reportData: FormData) => {
+    const session = await getServerSession(authOptions)
     try {
         const university = reportData.get("university") as string;
         const dateTime = reportData.get("dateTime") as string;
@@ -101,6 +106,10 @@ export const postReport = async (reportData: FormData) => {
             .map((file) => uploadToCloudinary(file));
 
         const proofUrls = await Promise.all(uploadPromises);
+
+        const emailSearchHash = generateBlindIndex(session?.user?.email || "")
+
+        const userId = await dbConnect(collections.USERS).findOne({ emailSearchHash }, { projection: { userId: 1, _id: 0 } })
 
         const payload: ReportPayload = {
             university,
@@ -125,7 +134,10 @@ export const postReport = async (reportData: FormData) => {
                 adminId: "",
                 appealSubmittedAt: null,
                 adminNote: ""
-            }
+            },
+            postId: nanoid(12),
+            studentEmail: emailSearchHash,
+            userId: userId?.userId || ""
         };
 
         const result = await dbConnect(collections.REPORTS).insertOne(payload)

@@ -36,8 +36,8 @@ export const registerUser = async (data: RegisterUser): Promise<RegisterUserRetu
     const encryptedName = encryptData(name);
     const encryptedEmail = encryptData(email);
     const encryptedPassword = await bcrypt.hash(password, 10);
-    const userId = `U${nanoid(10)}`;
-    
+    const userId = nanoid(10);
+
     const newUser: NewUser = {
       name: encryptedName,
       email: encryptedEmail,
@@ -49,7 +49,7 @@ export const registerUser = async (data: RegisterUser): Promise<RegisterUserRetu
       provider: "credentials",
       isVerified: false,
     };
-    
+
     const result = await dbConnect(collections.USERS).insertOne(newUser);
     return {
       success: result.acknowledged,
@@ -140,7 +140,7 @@ export const saveSocialUser = async (data: SocialData): Promise<SocialReturn> =>
 
     const encryptedName = encryptData(name);
     const encryptedEmail = encryptData(email);
-    const userId = `U${nanoid(10)}`;
+    const userId = nanoid(10);
     const newUser: SocialUser = {
       name: encryptedName,
       email: encryptedEmail,
@@ -151,7 +151,7 @@ export const saveSocialUser = async (data: SocialData): Promise<SocialReturn> =>
       provider,
       isVerified,
     };
-    
+
     const result = await dbConnect(collections.USERS).insertOne(newUser);
     if (result.acknowledged) {
       return {
@@ -172,7 +172,7 @@ export const verifyToken = async (token: string): Promise<VerifyTokenReturn> => 
   try {
     const session = await getServerSession(authOptions);
     const sessionEmail = session?.user?.email;
-    
+
     if (!sessionEmail) {
       return { success: false, message: "Unauthorized or missing email session" };
     }
@@ -195,7 +195,7 @@ export const verifyToken = async (token: string): Promise<VerifyTokenReturn> => 
     if (isTokenExpired) {
       return { success: false, message: "Token expired" };
     }
-    
+
     const emailSearchHash = generateBlindIndex(sessionEmail);
 
     const [updateUser] = await Promise.all([
@@ -207,7 +207,7 @@ export const verifyToken = async (token: string): Promise<VerifyTokenReturn> => 
         email: sessionEmail,
       }),
     ]);
-    
+
     return {
       success: !!updateUser?.acknowledged,
       message: updateUser?.acknowledged
@@ -228,7 +228,7 @@ export const getUserInfo = async (email: string): Promise<GetUserInfo> => {
       { emailSearchHash },
       { projection: { role: 1, isVerified: 1 } }
     );
-    
+
     if (!rawUser) {
       return { success: false, message: "User not found" };
     }
