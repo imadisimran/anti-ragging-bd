@@ -1,9 +1,14 @@
 "use client";
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
+import Swal from "sweetalert2";
 
 const SocialLogin = () => {
+  const searchParams = useSearchParams();
+  const callBackUrl = searchParams.get("callbackUrl");
+
   const handleGoogleLogin = async () => {
-    await signIn("google",{callbackUrl:"/"});
+    await signIn("google", { callbackUrl: callBackUrl || "/" });
   };
 
   return (

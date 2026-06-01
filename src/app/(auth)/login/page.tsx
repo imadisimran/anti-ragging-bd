@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { signIn } from "next-auth/react"
 
@@ -31,6 +31,9 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm<LoginData>();
 
+  const searchParams = useSearchParams()
+  const callBackUrl = searchParams.get("callbackUrl")
+
   const router = useRouter();
 
   const handleLogin: SubmitHandler<LoginData> = async (data) => {
@@ -50,7 +53,7 @@ export default function LoginPage() {
           showConfirmButton: true,
           timerProgressBar: true,
         });
-        router.push("/");
+        router.push(callBackUrl || "/");
         // router.refresh();
       } else {
         Swal.fire({

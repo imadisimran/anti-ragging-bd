@@ -70,7 +70,7 @@ Don't return anything except json format.
 `,
         });
 
-        console.log(response.text)
+        // console.log(response.text)
 
         const result: AiVerificationResult = JSON.parse(response.text || "")
         result.success = true
@@ -92,7 +92,7 @@ export const postReport = async (reportData: FormData) => {
 
         const aiResult = await aiVerification(narrative)
 
-        console.log(aiResult)
+        // console.log(aiResult)
 
         const files = reportData.getAll("proofFiles") as File[];
 
