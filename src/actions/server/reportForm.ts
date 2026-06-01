@@ -1,8 +1,9 @@
 "use server"
 
 import { dbConnect, collections } from "@/lib/dbConnect"
-import { GetLocation } from "@/types/reportForm.type"
+import { AiVerificationResult, GetLocation, ReportPayload } from "@/types/reportForm.type"
 import { v2 as cloudinary } from 'cloudinary'
+import { GoogleGenAI } from "@google/genai";
 
 export const getLocation = async (universityName: string, category: string): Promise<GetLocation | null> => {
     if (!category) {
@@ -34,6 +35,52 @@ const uploadToCloudinary = async (file: File): Promise<string> => {
     });
 };
 
+export const aiVerification = async (narrative: string) => {
+
+    try {
+        const ai = new GoogleGenAI({});
+        const response = await ai.models.generateContent({
+            model: "gemini-3.1-flash-lite",
+            contents: `You are the core security and engineering AI layer for "Anti-Ragging Bangladesh." Your task is to process raw first-person reports of university ragging and output a strictly structured JSON object for public documentation.
+
+CRITICAL LANGUAGE & PERSPECTIVE RULES:
+1. LANGUAGE MATCHING: You must output the "sanitizedTitle" and "sanitizedDescription" in the EXACT same language and script style as the input text. 
+   - If the input is in Bangla script (বাংলা), the output must be in Bangla script.
+   - If the input is in English, the output must be in English.
+   - If the input is in Banglish (Bengali written using the Latin alphabet, e.g., "amake rater bela daka hoyechelo"), the output must be strictly in Banglish, matching the phonetic style of the user.
+2. FIRST-PERrd-person. Preserve the exact emotional weight, timSON VIEW: Keep the narrative strictly in the FIRST-PERSON PERSPECTIVE ("I", "আমার", "amake", "amari"). Do not convert the story to thielines, specific room numbers, and locations.
+
+ABSOLUTE SAFETY & MODERATION RULES:
+1. REMOVE PROFANITY: Completely strip out or rephrase any explicit slang, vulgarities, or political slogans while preserving the underlying factual narrative.
+2. DEFAMATION SHIELD: Protect individual identities and prevent political weaponization. You must redact all specific individual names, political group student wing affiliations (e.g., Chhatra League, Chhatra Dal, Shibir), and specific victim names. Replace them with generic identifiers written in brackets that match the language/script of the text (e.g., English: "[a senior student]", Bangla: "[একজন বড় ভাই]", Banglish: "[ekjon boro bhai]").
+
+You must respond ONLY with a JSON object matching this schema:
+{
+  "isRaggingIncident": boolean, // true if the text describes actual ragging, physical/mental abuse, or forced attendance. false if it is an unrelated academic complaint.
+  "sanitizedTitle": "string", // A clean headline summarizing the incident matching the input language/script.
+  "sanitizedDescription": "string", // The first-person, redacted, profanity-free narrative matching the input language/script.
+  "detectedSeverity": "LOW" | "MEDIUM" | "HIGH", // HIGH if physical harm, confinement, or extreme mental torture is detailed.
+  "rejectionReason": "string" | null // If isRaggingIncident is false, provide a short reason in English for the human admin review queue.
+}
+
+Incident: ${narrative}
+
+Don't return anything except json format.
+
+`,
+        });
+
+        console.log(response.text)
+
+        const result: AiVerificationResult = JSON.parse(response.text || "")
+        result.success = true
+        return result
+    } catch (error) {
+        console.log(error)
+        return { success: false }
+    }
+}
+
 export const postReport = async (reportData: FormData) => {
     try {
         const university = reportData.get("university") as string;
@@ -43,17 +90,19 @@ export const postReport = async (reportData: FormData) => {
         const specificLocation = reportData.get("specificLocation") as string;
         const narrative = reportData.get("narrative") as string;
 
-        // Retrieve all files (using getAll since fromEntries or get only retrieves the first file)
+        const aiResult = await aiVerification(narrative)
+
+        console.log(aiResult)
+
         const files = reportData.getAll("proofFiles") as File[];
 
-        // Upload files to Cloudinary
         const uploadPromises = files
             .filter((file) => file.size > 0 && file.name !== "undefined")
             .map((file) => uploadToCloudinary(file));
 
         const proofUrls = await Promise.all(uploadPromises);
 
-        const payload = {
+        const payload: ReportPayload = {
             university,
             dateTime: new Date(dateTime),
             harassmentType,
@@ -61,6 +110,22 @@ export const postReport = async (reportData: FormData) => {
             specificLocation,
             narrative,
             proofUrls,
+            createdAt: new Date(),
+            isRaggingIncident: aiResult.success ? aiResult.isRaggingIncident : false,
+            detectedSeverity: aiResult.success ? aiResult.detectedSeverity : "LOW",
+            rejectionReason: aiResult.success ? aiResult.rejectionReason : null,
+            verifiedBy: aiResult.success ? "Ai" : "",
+            status: aiResult.success ? "SUBMITTED" : "PENDING",
+            sanitizedTitle: aiResult.success ? aiResult.sanitizedTitle : "",
+            sanitizedDescription: aiResult.success ? aiResult.sanitizedDescription : "",
+            adminVerification: {
+                isRequested: false,
+                appealNote: "",
+                status: "",
+                adminId: "",
+                appealSubmittedAt: null,
+                adminNote: ""
+            }
         };
 
         const result = await dbConnect(collections.REPORTS).insertOne(payload)

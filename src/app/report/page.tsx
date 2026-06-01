@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { CloudUpload, X } from "lucide-react";
-import { getLocation, postReport } from "@/actions/server/reportForm";
+import { aiVerification, getLocation, postReport } from "@/actions/server/reportForm";
 
 interface ReportFormInputs {
   university: string;
@@ -103,6 +103,7 @@ export default function ReportPage() {
     }
     
     const result = await postReport(formData)
+    const ai=await aiVerification(data.narrative)
     
   };
 
