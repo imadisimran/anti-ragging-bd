@@ -32,6 +32,7 @@ const uploadToCloudinary = async (file: File): Promise<string> => {
                 if (error) {
                     reject(error);
                 } else {
+                    console.log(result)
                     resolve(result?.secure_url || "");
                 }
             }
@@ -52,26 +53,29 @@ CRITICAL LANGUAGE & PERSPECTIVE RULES:
    - If the input is in Bangla script (বাংলা), the output must be in Bangla script.
    - If the input is in English, the output must be in English.
    - If the input is in Banglish (Bengali written using the Latin alphabet, e.g., "amake rater bela daka hoyechelo"), the output must be strictly in Banglish, matching the phonetic style of the user.
-2. FIRST-PERrd-person. Preserve the exact emotional weight, timSON VIEW: Keep the narrative strictly in the FIRST-PERSON PERSPECTIVE ("I", "আমার", "amake", "amari"). Do not convert the story to thielines, specific room numbers, and locations.
+2. FIRST-PERSON VIEW: Keep the narrative strictly in the FIRST-PERSON PERSPECTIVE ("I", "আমার", "amake", "amari"). Do not convert the story to third-person. Preserve the exact emotional weight, timelines, specific room numbers, and locations.
 
 ABSOLUTE SAFETY & MODERATION RULES:
 1. REMOVE PROFANITY: Completely strip out or rephrase any explicit slang, vulgarities, or political slogans while preserving the underlying factual narrative.
-2. DEFAMATION SHIELD: Protect individual identities and prevent political weaponization. You must redact all specific individual names, political group student wing affiliations (e.g., Chhatra League, Chhatra Dal, Shibir), and specific victim names. Replace them with generic identifiers written in brackets that match the language/script of the text (e.g., English: "[a senior student]", Bangla: "[একজন বড় ভাই]", Banglish: "[ekjon boro bhai]").
+2. SEAMLESS DEFAMATION SHIELD (NO BRACKETS): You must protect individual identities and prevent political weaponization by omitting or generalizing targeted names. 
+   - DO NOT use brackets (e.g., do not write "[a senior student]"). 
+   - Replace explicit specific individual names or political student wing affiliations with seamless generic terms that flow naturally in the sentence.
+   - Example 1 (Banglish): "Khaled namer ek boro vai" -> "ek boro vai".
+   - Example 2 (English): If 5 individual names are listed ("Asif, Fahim, Siyam, Joy, and Tanvir") -> change to "5 senior students".
+   - Example 3 (Bangla): "ছাত্রলীগের ইমতিয়াজ আর সাজিদ" -> "রাজনৈতিক সংগঠনের দুই বড় ভাই" or "দুইজন বড় ভাই".
 
 You must respond ONLY with a JSON object matching this schema:
 {
   "isRaggingIncident": boolean, // true if the text describes actual ragging, physical/mental abuse, or forced attendance. false if it is an unrelated academic complaint.
   "sanitizedTitle": "string", // A clean headline summarizing the incident matching the input language/script.
-  "sanitizedDescription": "string", // The first-person, redacted, profanity-free narrative matching the input language/script.
+  "sanitizedDescription": "string", // The first-person, seamlessly redacted, profanity-free narrative matching the input language/script. No brackets allowed.
   "detectedSeverity": "LOW" | "MEDIUM" | "HIGH", // HIGH if physical harm, confinement, or extreme mental torture is detailed.
   "rejectionReason": "string" | null // If isRaggingIncident is false, provide a short reason in English for the human admin review queue.
 }
 
 Incident: ${narrative}
 
-Don't return anything except json format.
-
-`,
+Don't return anything except json format.`,
         });
 
         // console.log(response.text)
@@ -109,7 +113,7 @@ export const postReport = async (reportData: FormData) => {
 
         const emailSearchHash = generateBlindIndex(session?.user?.email || "")
 
-        const userId = await dbConnect(collections.USERS).findOne({ emailSearchHash }, { projection: { userId: 1, _id: 0 } })
+        const userId = await dbConnect(collections.USERS).findOne({ emailSearchHash }, { projection: { userId: 1 } })
 
         const payload: ReportPayload = {
             university,
@@ -137,7 +141,7 @@ export const postReport = async (reportData: FormData) => {
             },
             postId: nanoid(12),
             studentEmail: emailSearchHash,
-            userId: userId?.userId || ""
+            userId: userId ? `${userId?.userId}:${userId?._id.toString()}` : ""
         };
 
         const result = await dbConnect(collections.REPORTS).insertOne(payload)

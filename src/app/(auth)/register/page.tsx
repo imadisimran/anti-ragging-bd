@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { SubmitHandler, useForm } from "react-hook-form";
 import {
@@ -25,7 +25,7 @@ interface RegisterData {
   confirm_password:string;
 }
 
-export default function RegisterPage() {
+function RegisterContent() {
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
   const {
@@ -272,5 +272,17 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-md w-full bg-base-100 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-base-200 p-8 md:p-10 flex items-center justify-center min-h-[300px]">
+        <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+      </div>
+    }>
+      <RegisterContent />
+    </Suspense>
   );
 }

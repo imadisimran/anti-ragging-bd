@@ -1,7 +1,7 @@
 "use client";
 import { verifyToken } from "@/actions/server/auth";
 import { useSearchParams, useRouter } from "next/navigation";
-import React, { useEffect, useState, Suspense } from "react";
+import React, { useEffect, useState, useRef, Suspense } from "react";
 import Swal from "sweetalert2";
 import { Loader2, XCircle, CheckCircle2, RefreshCcw } from "lucide-react";
 import Link from "next/link";
