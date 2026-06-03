@@ -1,10 +1,16 @@
+"use client"
 import { Bookmark, MessageSquare, Share2, ThumbsUp, User } from "lucide-react";
 import { ShortReport } from "@/types/report.type";
 import { formatDate } from "@/lib/formatDate";
+import { useRouter } from "next/navigation";
 
 export default function PostCard({ report }: { report: ShortReport }) {
+    const router = useRouter()
+    const handleClick = () => {
+        router.push(`/post/${report.postId}`)
+    }
     return (
-        <article className="bg-white rounded-xl p-4 sm:p-6 border border-outline-variant shadow-[0_1px_3px_0_rgba(15,23,42,0.03)] hover:shadow-md transition-all active:scale-[0.99] touch-manipulation group">
+        <article onClick={handleClick} className="bg-white rounded-xl p-4 sm:p-6 border border-outline-variant shadow-[0_1px_3px_0_rgba(15,23,42,0.03)] hover:shadow-md transition-all active:scale-[0.99] touch-manipulation group cursor-pointer">
             <div className="flex flex-col sm:flex-row justify-between items-start mb-4 gap-4">
                 <div className="flex gap-3">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-surface-container-high flex items-center justify-center overflow-hidden shrink-0">
