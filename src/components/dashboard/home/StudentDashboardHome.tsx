@@ -1,4 +1,6 @@
 "use client";
+
+import React, { useState, useEffect } from "react";
 import { 
   Folder, 
   Gavel, 
@@ -6,241 +8,706 @@ import {
   Hourglass, 
   Scale, 
   AlertCircle, 
-  TrendingUp, 
-  Sparkles, 
-  UserCheck,
   ChevronRight,
-  BookOpen,
-  ArrowUp
+  ArrowUp,
+  Search,
+  Filter,
+  ChevronDown,
+  X,
+  MapPin,
+  Calendar,
+  Paperclip,
+  ZoomIn
 } from "lucide-react";
+import { getStudentReports, getStudentReportDetail, StudentReport } from "@/actions/server/dashboard";
 
 export default function StudentDashboardHome() {
+  const [reports, setReports] = useState<StudentReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [selectedReport, setSelectedReport] = useState<StudentReport | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isZoomed, setIsZoomed] = useState(false);
+
+  // Search & Filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("All");
+  const [severityFilter, setSeverityFilter] = useState<string>("All");
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+
+  useEffect(() => {
+    async function loadReports() {
+      try {
+        setLoading(true);
+        const res = await getStudentReports();
+        if (res.success && res.data) {
+          setReports(res.data);
+        } else {
+          setError(res.error || "Failed to load reports.");
+        }
+      } catch (err) {
+        console.error(err);
+        setError("An error occurred while loading reports.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadReports();
+  }, []);
+
+  // Dynamic Metric Cards Calculations
+  const totalReportsCount = reports.length;
+
+  const activeCasesCount = reports.filter(r => 
+    r.isRaggingIncident && ["PENDING", "INVESTIGATING", "SUBMITTED"].includes(r.status.toUpperCase())
+  ).length;
+
+  const resolvedCount = reports.filter(r => 
+    ["RESOLVED", "APPROVED", "VERIFIED"].includes(r.status.toUpperCase())
+  ).length;
+
+  const resolvedPct = totalReportsCount > 0 
+    ? Math.round((resolvedCount / totalReportsCount) * 100) 
+    : 0;
+
+  const criticalActiveCount = reports.filter(r => 
+    r.isRaggingIncident &&
+    ["PENDING", "INVESTIGATING", "SUBMITTED"].includes(r.status.toUpperCase()) && 
+    r.detectedSeverity.toUpperCase() === "HIGH"
+  ).length;
+
+  const handleRowClick = async (report: StudentReport) => {
+    try {
+      const res = await getStudentReportDetail(report.postId);
+      if (res.success && res.data) {
+        setSelectedReport(res.data);
+      } else {
+        setSelectedReport(report);
+      }
+      setIsModalOpen(true);
+    } catch (err) {
+      console.error(err);
+      setSelectedReport(report);
+      setIsModalOpen(true);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setIsZoomed(false);
+  };
+
+  // Keyboard escape handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isModalOpen) {
+        handleCloseModal();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isModalOpen]);
+
+  const getDisplayStatus = (report: StudentReport) => {
+    if (!report.isRaggingIncident) return "REJECTED";
+    return report.status.toUpperCase();
+  };
+
+  // Filters logic
+  const filteredReports = reports.filter((report) => {
+    const matchesSearch =
+      report.postId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      report.university.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      report.harassmentType.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      report.sanitizedTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      report.sanitizedDescription.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesSeverity =
+      severityFilter === "All" || report.detectedSeverity.toUpperCase() === severityFilter.toUpperCase();
+
+    const matchesStatus =
+      statusFilter === "All" || getDisplayStatus(report) === statusFilter.toUpperCase();
+
+    return matchesSearch && matchesSeverity && matchesStatus;
+  });
+
+  const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
+  const paginatedReports = filteredReports.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const getSeverityConfig = (severity: string) => {
+    const s = severity?.toUpperCase() || "LOW";
+    switch (s) {
+      case "HIGH":
+        return {
+          width: "85%",
+          colorClass: "bg-error text-error",
+          label: "HIGH"
+        };
+      case "MEDIUM":
+        return {
+          width: "50%",
+          colorClass: "bg-warning text-warning",
+          label: "MEDIUM"
+        };
+      case "LOW":
+      default:
+        return {
+          width: "15%",
+          colorClass: "bg-secondary text-secondary",
+          label: "LOW"
+        };
+    }
+  };
+
+  const getStatusBadgeConfig = (status: string, isRaggingIncident: boolean) => {
+    if (!isRaggingIncident) {
+      return {
+        bgClass: "bg-error-container text-on-error-container border border-error/20",
+        label: "REJECTED",
+        icon: <AlertCircle className="w-[18px] h-[18px] text-error" />
+      };
+    }
+    const s = status?.toUpperCase() || "SUBMITTED";
+    switch (s) {
+      case "REJECTED":
+        return {
+          bgClass: "bg-error-container text-on-error-container border border-error/20",
+          label: "REJECTED",
+          icon: <AlertCircle className="w-[18px] h-[18px] text-error" />
+        };
+      case "APPROVED":
+      case "RESOLVED":
+      case "VERIFIED":
+        return {
+          bgClass: "bg-emerald-50 text-emerald-700 border-emerald-200/50",
+          label: s,
+          icon: <CheckCircle className="w-[18px] h-[18px] text-emerald-600" />
+        };
+      case "PENDING":
+      case "INVESTIGATING":
+        return {
+          bgClass: "bg-amber-50 text-amber-700 border-amber-200/50",
+          label: s,
+          icon: <Hourglass className="w-[18px] h-[18px] text-amber-600 animate-pulse" />
+        };
+      case "SUBMITTED":
+      default:
+        return {
+          bgClass: "bg-slate-100 text-on-surface-variant border border-slate-200",
+          label: "SUBMITTED",
+          icon: <Scale className="w-[18px] h-[18px] text-outline" />
+        };
+    }
+  };
+
+  const formatYYYYMMDD = (dateVal: Date | string | number) => {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return "N/A";
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   return (
-    <div className="space-y-stack-lg">
+    <div className="space-y-stack-lg animate-in fade-in duration-300">
       
       {/* Welcome Header */}
       <header className="mb-stack-lg">
         <h1 className="text-display text-primary mb-2">Student Safety Dashboard</h1>
         <p className="text-body-md text-on-surface-variant">
-          System oversight and institutional accountability metrics.
+          System oversight, personal reports log, and institutional accountability metrics.
         </p>
       </header>
 
       {/* 1. Top Metric Cards (Bento Style) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-gutter mb-stack-lg">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-gutter mb-stack-lg">
         
         {/* Total Reports */}
-        <div className="bg-white border border-outline-variant p-stack-lg rounded-lg shadow-[0_1px_3px_0_rgba(15,23,42,0.03)] hover:border-secondary transition-colors group cursor-pointer">
+        <div className="bg-white border border-outline-variant p-stack-lg rounded-lg shadow-[0_1px_3px_0_rgba(15,23,42,0.03)] hover:border-secondary transition-all group cursor-pointer">
           <div className="flex justify-between items-start mb-4">
             <span className="text-label-md font-bold text-on-surface-variant">Total Reports</span>
             <Folder className="w-5 h-5 text-secondary opacity-50 group-hover:opacity-100 transition-opacity" />
           </div>
-          <div className="text-display font-display text-primary">1,284</div>
+          <div className="text-display font-display text-primary">{totalReportsCount}</div>
           <div className="flex items-center gap-1 text-green-600 mt-2">
             <ArrowUp className="w-4 h-4" />
+            {/* NOTE: Trend indicator is kept static per design specs */}
             <span className="text-xs font-bold">+12% from last month</span>
           </div>
         </div>
 
         {/* Active Cases */}
-        <div className="bg-white border border-outline-variant p-stack-lg rounded-lg shadow-[0_1px_3px_0_rgba(15,23,42,0.03)] hover:border-secondary transition-colors group cursor-pointer">
+        <div className="bg-white border border-outline-variant p-stack-lg rounded-lg shadow-[0_1px_3px_0_rgba(15,23,42,0.03)] hover:border-secondary transition-all group cursor-pointer">
           <div className="flex justify-between items-start mb-4">
             <span className="text-label-md font-bold text-on-surface-variant">Active Cases</span>
             <Gavel className="w-5 h-5 text-secondary opacity-50 group-hover:opacity-100 transition-opacity" />
           </div>
-          <div className="text-display font-display text-primary">42</div>
+          <div className="text-display font-display text-primary">{activeCasesCount}</div>
           <div className="flex items-center gap-1 text-on-surface-variant mt-2">
             <Hourglass className="w-3.5 h-3.5" />
-            <span className="text-xs font-bold ml-1">14 critical priority</span>
+            <span className="text-xs font-bold ml-1">{criticalActiveCount} critical priority</span>
           </div>
         </div>
 
         {/* Resolved percentage */}
-        <div className="bg-white border border-outline-variant p-stack-lg rounded-lg shadow-[0_1px_3px_0_rgba(15,23,42,0.03)] hover:border-secondary transition-colors group cursor-pointer">
+        <div className="bg-white border border-outline-variant p-stack-lg rounded-lg shadow-[0_1px_3px_0_rgba(15,23,42,0.03)] hover:border-secondary transition-all group cursor-pointer">
           <div className="flex justify-between items-start mb-4">
             <span className="text-label-md font-bold text-on-surface-variant">Resolved</span>
             <CheckCircle className="w-5 h-5 text-secondary opacity-50 group-hover:opacity-100 transition-opacity" />
           </div>
-          <div className="text-display font-display text-primary">96%</div>
+          <div className="text-display font-display text-primary">{resolvedPct}%</div>
+          {/* NOTE: Resolution average is kept static per design specs */}
           <div className="flex items-center gap-1 text-on-surface-variant mt-2 text-xs font-bold">
             Average resolution: 4.2 days
           </div>
         </div>
 
-        {/* Pending Appeals */}
-        <div className="bg-white border border-outline-variant p-stack-lg rounded-lg shadow-[0_1px_3px_0_rgba(15,23,42,0.03)] hover:border-secondary transition-colors group cursor-pointer">
-          <div className="flex justify-between items-start mb-4">
-            <span className="text-label-md font-bold text-on-surface-variant">Pending Appeals</span>
-            <Scale className="w-5 h-5 text-secondary opacity-50 group-hover:opacity-100 transition-opacity" />
+      </div>
+
+      {/* 2. My Submitted Reports Table */}
+      <div className="bg-white border border-outline-variant rounded-lg shadow-sm overflow-hidden flex flex-col min-h-[400px]">
+        <div className="p-5 border-b border-outline-variant flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center bg-surface-container-low">
+          <div>
+            <h2 className="text-headline-sm font-bold text-primary">My Submitted Reports</h2>
+            <p className="text-xs text-on-surface-variant mt-0.5">
+              Track status, category classification, and AI/Admin verification of your submitted cases.
+            </p>
           </div>
-          <div className="text-display font-display text-primary">08</div>
-          <div className="flex items-center gap-1 text-error mt-2">
-            <AlertCircle className="w-4 h-4" />
-            <span className="text-xs font-bold">Requires urgent review</span>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Search Box */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-outline w-4 h-4" />
+              <input
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                className="pl-9 pr-4 py-2 bg-white border border-outline-variant text-body-md rounded-md focus:outline-none focus:border-secondary w-full sm:w-64 placeholder-on-surface-variant/40"
+                placeholder="Search my reports..."
+                type="text"
+              />
+            </div>
+
+            {/* Filter Toggle */}
+            <div className="relative">
+              <button
+                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                className={`flex items-center gap-1.5 px-3 py-2 border rounded-md text-label-md font-bold transition-all hover:bg-slate-50 cursor-pointer ${
+                  severityFilter !== "All" || statusFilter !== "All"
+                    ? "border-secondary text-secondary bg-secondary-fixed/10"
+                    : "border-outline text-on-surface"
+                }`}
+              >
+                <Filter className="w-4 h-4" />
+                <span>Filter</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showFilterDropdown ? "rotate-180" : ""}`} />
+              </button>
+
+              {/* Filters Dropdown Card */}
+              {showFilterDropdown && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowFilterDropdown(false)}></div>
+                  <div className="absolute right-0 mt-2 w-72 bg-white border border-outline-variant rounded-lg shadow-lg p-4 z-20 space-y-4 animate-in fade-in duration-100">
+                    <div>
+                      <h4 className="text-label-sm font-bold text-on-surface-variant uppercase tracking-wider mb-2">Severity</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {["All", "High", "Medium", "Low"].map((sev) => (
+                          <button
+                            key={sev}
+                            onClick={() => { setSeverityFilter(sev); setCurrentPage(1); }}
+                            className={`px-3 py-1 text-xs rounded-full font-semibold border cursor-pointer transition-all ${
+                              severityFilter.toUpperCase() === sev.toUpperCase()
+                                ? "bg-primary text-white border-primary"
+                                : "bg-slate-50 text-on-surface-variant border-outline-variant hover:bg-slate-100"
+                            }`}
+                          >
+                            {sev}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="border-t border-slate-100 pt-3">
+                      <h4 className="text-label-sm font-bold text-on-surface-variant uppercase tracking-wider mb-2">Status</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {["All", "SUBMITTED", "PENDING", "INVESTIGATING", "RESOLVED", "REJECTED"].map((stat) => (
+                          <button
+                            key={stat}
+                            onClick={() => { setStatusFilter(stat); setCurrentPage(1); }}
+                            className={`px-2.5 py-1 text-xs rounded-full font-semibold border cursor-pointer transition-all ${
+                              statusFilter.toUpperCase() === stat.toUpperCase()
+                                ? "bg-secondary text-white border-secondary"
+                                : "bg-slate-50 text-on-surface-variant border-outline-variant hover:bg-slate-100"
+                            }`}
+                          >
+                            {stat}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="border-t border-slate-100 pt-2 flex justify-between">
+                      <button
+                        onClick={() => {
+                          setSeverityFilter("All");
+                          setStatusFilter("All");
+                          setCurrentPage(1);
+                          setShowFilterDropdown(false);
+                        }}
+                        className="text-xs text-on-surface-variant hover:text-primary font-bold cursor-pointer"
+                      >
+                        Reset All
+                      </button>
+                      <button
+                        onClick={() => setShowFilterDropdown(false)}
+                        className="text-xs text-secondary font-bold hover:underline cursor-pointer"
+                      >
+                        Apply Filters
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
+        {/* Table Layout */}
+        <div className="overflow-x-auto flex-1">
+          <table className="w-full text-left border-collapse min-w-[700px]">
+            <thead className="bg-slate-50 border-b border-outline-variant">
+              <tr>
+                <th className="px-6 py-4 text-label-sm font-bold text-outline uppercase tracking-wider">Report ID</th>
+                <th className="px-6 py-4 text-label-sm font-bold text-outline uppercase tracking-wider">Date Reported</th>
+                <th className="px-6 py-4 text-label-sm font-bold text-outline uppercase tracking-wider">Title</th>
+                <th className="px-6 py-4 text-label-sm font-bold text-outline uppercase tracking-wider">Severity</th>
+                <th className="px-6 py-4 text-label-sm font-bold text-outline uppercase tracking-wider">Status</th>
+                <th className="px-6 py-4 w-12"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant">
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-on-surface-variant/60 font-body-lg">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Hourglass className="w-8 h-8 animate-spin text-secondary" />
+                      <p>Loading reports...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-error font-body-lg">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <AlertCircle className="w-8 h-8 text-error" />
+                      <p>{error}</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : paginatedReports.length > 0 ? (
+                paginatedReports.map((report) => {
+                  const isHigh = report.detectedSeverity.toUpperCase() === "HIGH";
+                  const isMedium = report.detectedSeverity.toUpperCase() === "MEDIUM";
+
+                  return (
+                    <tr
+                      key={report.postId}
+                      onClick={() => handleRowClick(report)}
+                      className="hover:bg-slate-50/80 cursor-pointer transition-colors duration-150 group"
+                    >
+                      <td className="px-6 py-4 text-label-md font-bold text-primary group-hover:text-secondary transition-colors">
+                        #{report.postId}
+                      </td>
+                      <td className="px-6 py-4 text-body-md text-on-surface-variant">
+                        {formatYYYYMMDD(report.createdAt)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-body-md text-on-surface font-semibold line-clamp-1">{report.sanitizedTitle || "Untitled Report"}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-wider inline-block ${
+                            isHigh
+                              ? "bg-error-container/50 text-error border border-error/20"
+                              : isMedium
+                              ? "bg-amber-100 text-amber-800 border border-amber-200/50"
+                              : "bg-slate-100 text-on-surface-variant border border-slate-200"
+                          }`}
+                        >
+                          {report.detectedSeverity}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className={`px-2.5 py-1 rounded uppercase tracking-wider text-[10px] font-bold inline-flex items-center gap-1.5 ${getStatusBadgeConfig(report.status, report.isRaggingIncident).bgClass}`}>
+                          {getStatusBadgeConfig(report.status, report.isRaggingIncident).icon}
+                          {getStatusBadgeConfig(report.status, report.isRaggingIncident).label}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <ChevronRight className="w-5 h-5 text-outline opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-on-surface-variant/60 font-body-lg">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <AlertCircle className="w-8 h-8 text-on-surface-variant/40" />
+                      <p>You have not submitted any reports matching the selected filters.</p>
+                      <button
+                        onClick={() => {
+                          setSearchQuery("");
+                          setSeverityFilter("All");
+                          setStatusFilter("All");
+                        }}
+                        className="text-secondary font-bold hover:underline text-xs mt-1"
+                      >
+                        Reset search filters
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination Footer */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-outline-variant flex justify-between items-center bg-slate-50 text-label-sm font-bold text-outline">
+            <span>
+              Showing {Math.min(filteredReports.length, (currentPage - 1) * itemsPerPage + 1)}-
+              {Math.min(filteredReports.length, currentPage * itemsPerPage)} of {filteredReports.length} reports
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage((c) => Math.max(1, c - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 border border-outline rounded bg-white hover:bg-slate-100 disabled:opacity-50 disabled:hover:bg-white text-on-surface cursor-pointer flex items-center gap-1 transition-colors"
+              >
+                Previous
+              </button>
+              {Array.from({ length: totalPages }).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentPage(i + 1)}
+                  className={`px-3 py-1.5 border rounded cursor-pointer transition-colors ${
+                    currentPage === i + 1
+                      ? "bg-primary text-white border-primary"
+                      : "bg-white hover:bg-slate-100 border-outline text-on-surface"
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+              <button
+                onClick={() => setCurrentPage((c) => Math.min(totalPages, c + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 border border-outline rounded bg-white hover:bg-slate-100 disabled:opacity-50 disabled:hover:bg-white text-on-surface cursor-pointer flex items-center gap-1 transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Main Workspace Grid */}
-      <div className="grid grid-cols-12 gap-gutter">
-        
-        {/* 2. Live Audit Timeline */}
-        <div className="col-span-12 lg:col-span-8 space-y-stack-md">
-          <div className="bg-white border border-outline-variant rounded-lg p-stack-lg shadow-[0_1px_3px_0_rgba(15,23,42,0.03)]">
-            <div className="flex justify-between items-center mb-stack-lg">
-              <h2 className="text-headline-sm font-bold text-primary flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-primary" />
-                Live Audit Timeline
-              </h2>
-              <button className="text-label-md font-bold text-secondary hover:underline cursor-pointer">
-                Download Report
+
+
+      {/* Incident Detail Modal */}
+      {isModalOpen && selectedReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          {/* Modal Backdrop click listener */}
+          <div className="absolute inset-0" onClick={handleCloseModal}></div>
+
+          {/* Modal Container */}
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            
+            {/* Modal Header */}
+            <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-slate-50/50">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-label-sm font-bold text-outline uppercase tracking-wider">Report Ref</span>
+                <span className="text-headline-md font-extrabold text-primary">#{selectedReport.postId}</span>
+                
+                <span
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-wider ${
+                    selectedReport.detectedSeverity.toUpperCase() === "HIGH"
+                      ? "bg-error-container/50 text-error border border-error/20"
+                      : selectedReport.detectedSeverity.toUpperCase() === "MEDIUM"
+                      ? "bg-amber-100 text-amber-800 border border-amber-200/50"
+                      : "bg-slate-100 text-on-surface-variant border border-slate-200"
+                  }`}
+                >
+                  {selectedReport.detectedSeverity} SEVERITY
+                </span>
+                
+                <div className={`px-2.5 py-1 rounded uppercase tracking-wider text-[10px] font-bold flex items-center gap-1.5 ${getStatusBadgeConfig(selectedReport.status, selectedReport.isRaggingIncident).bgClass}`}>
+                  {getStatusBadgeConfig(selectedReport.status, selectedReport.isRaggingIncident).icon}
+                  {getStatusBadgeConfig(selectedReport.status, selectedReport.isRaggingIncident).label}
+                </div>
+              </div>
+              <button
+                onClick={handleCloseModal}
+                className="p-1.5 text-on-surface-variant hover:text-primary hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-6 h-6" />
               </button>
             </div>
 
-            <div className="relative pl-8 space-y-6 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-[2px] before:bg-outline-variant">
-              
-              {/* Item 1 */}
-              <div className="relative">
-                <div className="absolute -left-[29px] top-1 w-6 h-6 rounded-full bg-secondary text-white flex items-center justify-center z-10">
-                  <Sparkles className="w-3.5 h-3.5" />
-                </div>
-                <div className="bg-white/80 backdrop-blur-md border border-slate-200 p-4 rounded-lg hover:-translate-y-0.5 hover:shadow-md transition-all duration-200">
-                  <div className="flex justify-between items-start gap-4">
-                    <div>
-                      <span className="text-xs font-bold text-secondary uppercase tracking-wider">AI Analysis</span>
-                      <h3 className="text-body-lg font-bold text-primary mt-1">AI sanitized text approved for Incident #4901</h3>
-                      <p className="text-body-md text-on-surface-variant mt-1">
-                        Sensitive metadata removed from public statement per victim request.
-                      </p>
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                
+                {/* Left Side: Metadata snapshot */}
+                <div className="md:col-span-1 space-y-6">
+                  {/* Location Info Card */}
+                  <div className="p-4 bg-slate-50 border border-outline-variant rounded-lg space-y-3">
+                    <div className="flex items-center gap-2 text-outline text-label-sm font-bold uppercase tracking-wider">
+                      <MapPin className="w-4 h-4 text-on-surface-variant" />
+                      <span>University & Location</span>
                     </div>
-                    <span className="text-xs text-on-surface-variant font-medium whitespace-nowrap">2 mins ago</span>
+                    <p className="text-body-lg font-bold text-on-surface">{selectedReport.university}</p>
+                    <p className="text-body-md font-semibold text-on-surface-variant">{selectedReport.specificLocation}</p>
+                  </div>
+
+                  {/* Timestamp Card */}
+                  <div className="p-4 bg-slate-50 border border-outline-variant rounded-lg space-y-3">
+                    <div className="flex items-center gap-2 text-outline text-label-sm font-bold uppercase tracking-wider">
+                      <Calendar className="w-4 h-4 text-on-surface-variant" />
+                      <span>Date Occurred</span>
+                    </div>
+                    <p className="text-body-md font-semibold text-on-surface">{formatYYYYMMDD(selectedReport.dateTime)}</p>
+                  </div>
+
+                  {/* Date Reported Card */}
+                  <div className="p-4 bg-slate-50 border border-outline-variant rounded-lg space-y-3">
+                    <div className="flex items-center gap-2 text-outline text-label-sm font-bold uppercase tracking-wider">
+                      <Calendar className="w-4 h-4 text-on-surface-variant" />
+                      <span>Date Reported</span>
+                    </div>
+                    <p className="text-body-md font-semibold text-on-surface">{formatYYYYMMDD(selectedReport.createdAt)}</p>
+                  </div>
+
+                  {/* Evidence Card */}
+                  <div className="p-4 bg-slate-50 border border-outline-variant rounded-lg space-y-3">
+                    <div className="flex items-center gap-2 text-outline text-label-sm font-bold uppercase tracking-wider">
+                      <Paperclip className="w-4 h-4 text-on-surface-variant" />
+                      <span>Proof Attachments</span>
+                    </div>
+                    {selectedReport.proofUrls.length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-label-md font-bold text-secondary">{selectedReport.proofUrls.length} Files Attached</p>
+                        <ul className="text-xs text-on-surface-variant space-y-1">
+                          {selectedReport.proofUrls.map((url, idx) => (
+                            <li key={idx} className="flex items-center gap-1.5 hover:text-primary hover:underline cursor-pointer">
+                              <Paperclip className="w-3 h-3 text-outline" />
+                              <a href={url} target="_blank" rel="noopener noreferrer" className="truncate flex-1">
+                                proof_attachment_0{idx + 1}.bin
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <p className="text-body-md text-on-surface-variant italic">No files attached.</p>
+                    )}
                   </div>
                 </div>
-              </div>
 
-              {/* Item 2 */}
-              <div className="relative">
-                <div className="absolute -left-[29px] top-1 w-6 h-6 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center z-10 border border-outline-variant">
-                  <UserCheck className="w-3.5 h-3.5" />
-                </div>
-                <div className="bg-white/80 backdrop-blur-md border border-slate-200 p-4 rounded-lg hover:-translate-y-0.5 hover:shadow-md transition-all duration-200">
-                  <div className="flex justify-between items-start gap-4">
-                    <div>
-                      <span className="text-xs font-bold text-primary-container uppercase tracking-wider">Provost Action</span>
-                      <h3 className="text-body-lg font-bold text-primary mt-1">Status change: Investigation Commenced</h3>
-                      <p className="text-body-md text-on-surface-variant mt-1">
-                        Hall Provost Dr. Ahmed initiated formal hearing for Case #4882.
-                      </p>
-                    </div>
-                    <span className="text-xs text-on-surface-variant font-medium whitespace-nowrap">1 hour ago</span>
+                {/* Right Side: Narrative */}
+                <div className="md:col-span-2 space-y-6">
+                  <div>
+                    <span className="text-label-sm font-bold text-outline uppercase tracking-wider">Harassment Category</span>
+                    <h3 className="text-headline-md font-bold text-primary mt-1">{selectedReport.harassmentType}</h3>
                   </div>
-                </div>
-              </div>
 
-              {/* Item 3 */}
-              <div className="relative">
-                <div className="absolute -left-[29px] top-1 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center z-10 border border-green-200">
-                  <CheckCircle className="w-3.5 h-3.5" />
-                </div>
-                <div className="bg-white/80 backdrop-blur-md border border-slate-200 p-4 rounded-lg hover:-translate-y-0.5 hover:shadow-md transition-all duration-200">
-                  <div className="flex justify-between items-start gap-4">
-                    <div>
-                      <span className="text-xs font-bold text-green-700 uppercase tracking-wider">Resolution</span>
-                      <h3 className="text-body-lg font-bold text-primary mt-1">Institutional Penalty Applied</h3>
-                      <p className="text-body-md text-on-surface-variant mt-1">
-                        Academic suspension confirmed for Incident #4711 following judicial review.
-                      </p>
-                    </div>
-                    <span className="text-xs text-on-surface-variant font-medium whitespace-nowrap">5 hours ago</span>
+                  <div>
+                    <p className="text-label-sm font-bold text-outline uppercase tracking-wider">Sanitized Title</p>
+                    <h4 className="text-headline-sm font-semibold text-primary mt-1">{selectedReport.sanitizedTitle || "Untitled"}</h4>
                   </div>
-                </div>
-              </div>
 
+                  <div>
+                    <p className="text-label-sm font-bold text-outline uppercase tracking-wider mb-2">Sanitized Narrative</p>
+                    <div className="p-5 bg-slate-50 border-l-4 border-primary rounded-r-lg text-body-lg text-on-surface leading-relaxed italic">
+                      &quot;{selectedReport.sanitizedDescription}&quot;
+                    </div>
+                  </div>
+
+                  {selectedReport.proofUrls.length > 0 && (
+                    <div>
+                      <p className="text-label-sm font-bold text-outline uppercase tracking-wider mb-3">Verification Video/Image Proof</p>
+                      <div
+                        onClick={() => setIsZoomed(true)}
+                        className="relative group cursor-pointer border border-outline-variant h-64 rounded-lg overflow-hidden shadow-sm bg-slate-100 flex items-center justify-center"
+                      >
+                        <img
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          alt="Submitted proof capture"
+                          src={selectedReport.proofUrls[0]}
+                        />
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="bg-white/90 text-primary px-4 py-2 font-bold text-label-md flex items-center gap-2 rounded shadow">
+                            <ZoomIn className="w-4 h-4" />
+                            Zoom and Analyze Proof
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+              </div>
             </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-outline-variant bg-slate-50 flex flex-col sm:flex-row sm:justify-between items-center gap-4">
+              <div className="text-xs text-on-surface-variant flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                <span>Case monitored under Safety Mandate Guidelines.</span>
+              </div>
+              <button
+                onClick={handleCloseModal}
+                className="px-5 py-2 bg-primary text-on-primary font-bold text-label-md rounded hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-sm w-full sm:w-auto"
+              >
+                Close Details
+              </button>
+            </div>
+
           </div>
         </div>
+      )}
 
-        {/* 3. Platform Health & Detail Panel */}
-        <div className="col-span-12 lg:col-span-4 space-y-stack-md">
-          
-          {/* Health Widget */}
-          <div className="bg-primary-container text-on-primary-fixed p-stack-lg rounded-lg shadow-sm">
-            <h3 className="text-label-md font-bold uppercase tracking-widest opacity-80 mb-4 text-white">Platform Health</h3>
-            <div className="flex items-end justify-between gap-4 mb-6">
-              <div className="text-display font-display text-white">92.4%</div>
-              <div className="text-right">
-                <div className="text-xs font-bold text-secondary-fixed">Responsiveness</div>
-                <div className="text-xs text-white opacity-70">Nationwide Average</div>
-              </div>
-            </div>
-            {/* Mock Graph Visual */}
-            <div className="flex items-end gap-2 h-24 mb-4">
-              <div className="bg-secondary-fixed opacity-40 w-full h-[40%] rounded-t-sm"></div>
-              <div className="bg-secondary-fixed opacity-60 w-full h-[60%] rounded-t-sm"></div>
-              <div className="bg-secondary-fixed opacity-40 w-full h-[30%] rounded-t-sm"></div>
-              <div className="bg-secondary-fixed opacity-80 w-full h-[85%] rounded-t-sm"></div>
-              <div className="bg-secondary-fixed w-full h-[92%] rounded-t-sm"></div>
-              <div className="bg-secondary-fixed opacity-70 w-full h-[55%] rounded-t-sm"></div>
-            </div>
-            <p className="text-body-md text-white/80 leading-relaxed">
-              University response times have decreased by <span className="font-bold text-white">18%</span> since the implementation of AI triage pipelines.
+      {/* Lightbox / Zoom Modal */}
+      {isZoomed && selectedReport && selectedReport.proofUrls.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 animate-in fade-in duration-150">
+          <button
+            onClick={() => setIsZoomed(false)}
+            className="absolute top-6 right-6 p-2 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
+            title="Close Zoom"
+          >
+            <X className="w-8 h-8" />
+          </button>
+          <div className="max-w-5xl w-full max-h-[85vh] relative flex flex-col items-center justify-center">
+            <img
+              className="max-w-full max-h-[80vh] object-contain rounded-lg border border-white/10 shadow-2xl"
+              alt="Zoomed proof capture"
+              src={selectedReport.proofUrls[0]}
+            />
+            <p className="text-white/60 text-xs font-semibold mt-4 text-center">
+              Attachment Extract - Ref ID: #{selectedReport.postId} - University: {selectedReport.university}
             </p>
           </div>
-
-          {/* Active Investigations */}
-          <div className="bg-white border border-outline-variant p-stack-lg rounded-lg shadow-sm">
-            <h3 className="text-headline-sm font-bold text-primary mb-4">Active Investigations</h3>
-            <div className="space-y-4">
-              
-              {/* Institution 1 */}
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-xs text-primary flex-shrink-0">
-                  BU
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-label-md font-bold text-primary truncate">Bangladesh University</div>
-                  <div className="w-full bg-slate-100 h-1 rounded-full mt-1 overflow-hidden">
-                    <div className="bg-secondary h-full w-[75%]"></div>
-                  </div>
-                </div>
-                <span className="text-xs font-bold text-on-surface-variant flex-shrink-0">12</span>
-              </div>
-
-              {/* Institution 2 */}
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-xs text-primary flex-shrink-0">
-                  DU
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-label-md font-bold text-primary truncate">Dhaka Institute</div>
-                  <div className="w-full bg-slate-100 h-1 rounded-full mt-1 overflow-hidden">
-                    <div className="bg-secondary h-full w-[40%]"></div>
-                  </div>
-                </div>
-                <span className="text-xs font-bold text-on-surface-variant flex-shrink-0">08</span>
-              </div>
-
-            </div>
-          </div>
-
-          {/* CTA Panel */}
-          <div className="relative overflow-hidden bg-black text-white p-stack-lg rounded-lg min-h-[160px] flex flex-col justify-end shadow-sm group">
-            <div className="absolute top-0 right-0 p-4 transform group-hover:scale-110 transition-transform duration-300">
-              <BookOpen className="text-white/10 w-24 h-24" />
-            </div>
-            <h4 className="text-headline-sm font-bold relative z-10 text-white">Legal Resource Center</h4>
-            <p className="text-body-md text-white/70 mb-4 relative z-10 leading-snug">
-              Access pro-bono legal templates and institutional bylaws.
-            </p>
-            <button className="bg-secondary-container text-white py-2 rounded text-label-md font-bold relative z-10 hover:opacity-90 transition-opacity cursor-pointer">
-              Access Library
-            </button>
-          </div>
-
         </div>
-
-      </div>
+      )}
 
     </div>
   );
