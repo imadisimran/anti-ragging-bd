@@ -1,9 +1,9 @@
-import { Filter } from "lucide-react";
+import { Filter, AlertTriangle } from "lucide-react";
 import PostCard from "@/components/home/PostCard";
-import { getShortReport } from "@/actions/server/report";
+import { getShortReports } from "@/actions/server/report";
 
 export default async function Home() {
-  const reports = await getShortReport()
+  const response = await getShortReports()
   return (
     <div className="max-w-4xl mx-auto">
       <header className="mb-stack-lg flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
@@ -20,7 +20,24 @@ export default async function Home() {
       </header>
 
       <div className="space-y-6">
-        {reports.map(r => (<PostCard key={r.postId} report={r}></PostCard>))}
+        {!response.success ? (
+          <div className="flex flex-col items-center justify-center p-8 text-center bg-red-50 border border-red-200 rounded-xl shadow-sm">
+            <AlertTriangle className="w-12 h-12 text-red-500 mb-3" />
+            <h3 className="text-headline-sm font-bold text-red-700">Failed to load reports</h3>
+            <p className="text-body-md text-red-600 mt-1 max-w-md">
+              {response.error || "An unexpected database or connection error occurred."}
+            </p>
+          </div>
+        ) : !response.data || response.data.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-8 text-center bg-surface-container-low border border-outline-variant rounded-xl">
+            <h3 className="text-headline-sm font-bold text-on-surface-variant">No reports found</h3>
+            <p className="text-body-md text-on-surface-variant mt-1">
+              There are currently no documented incidents.
+            </p>
+          </div>
+        ) : (
+          response.data.map(r => (<PostCard key={r.postId} report={r}></PostCard>))
+        )}
       </div>
 
       {/* Responsive Tablet/Mobile Section (Stacked content) */}

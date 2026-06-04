@@ -1,8 +1,8 @@
 "use server"
 import { collections, dbConnect } from "@/lib/dbConnect"
-import { ShortReport } from "@/types/report.type"
+import { ReportDetail, ShortReport, ShortReports } from "@/types/report.type"
 
-export const getShortReport = async (): Promise<ShortReport[]> => {
+export const getShortReports = async (): Promise<ShortReports> => {
     try {
         const rawData = await dbConnect(collections.REPORTS).find({ isRaggingIncident: true }, { projection: { postId: 1, sanitizedTitle: 1, sanitizedDescription: 1, dateTime: 1, location: 1, createdAt: 1, userId: 1, status: 1 } }).toArray()
         const data: ShortReport[] = rawData.map(item => ({
@@ -15,9 +15,48 @@ export const getShortReport = async (): Promise<ShortReport[]> => {
             createdAt: item.createdAt,
             status: item.status
         }))
+        const reports: ShortReports = { success: true, data }
+        return reports
+    } catch (error) {
+        console.error(error)
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to fetch reports. Please try again later."
+        }
+    }
+}
+
+export const getDetailsReport = async (id: string): Promise<ReportDetail> => {
+    try {
+        const rawReportData = await dbConnect(collections.REPORTS).findOne({ postId: id }, { projection: { university: 1, dateTime: 1, harassmentType: 1, specificLocation: 1, proofUrls: 1, createdAt: 1, detectedSeverity: 1, status: 1, sanitizedTitle: 1, sanitizedDescription: 1, postId: 1, userId: 1 } })
+        
+        if (!rawReportData) {
+            return { success: false, error: "Report not found." }
+        }
+
+        const data: ReportDetail = {
+            success: true,
+            data: {
+                postId: rawReportData.postId || "",
+                userId: rawReportData.userId ? rawReportData.userId.split(":")[0] : "",
+                university: rawReportData.university || "",
+                dateTime: rawReportData.dateTime,
+                harassmentType: rawReportData.harassmentType || "",
+                specificLocation: rawReportData.specificLocation || "",
+                proofUrls: rawReportData.proofUrls || [],
+                createdAt: rawReportData.createdAt,
+                detectedSeverity: rawReportData.detectedSeverity || "LOW",
+                status: rawReportData.status || "PENDING",
+                title: rawReportData.sanitizedTitle || "",
+                description: rawReportData.sanitizedDescription || ""
+            }
+        }
         return data
     } catch (error) {
-        console.log(error)
-        return []
+        console.error(error)
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to retrieve report details."
+        }
     }
 }
