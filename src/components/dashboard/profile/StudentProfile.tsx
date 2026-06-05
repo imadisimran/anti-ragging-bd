@@ -23,6 +23,8 @@ export default function StudentProfile() {
     const [universitites, setUniversitites] = useState<GetUniversity[] | null>(null);
     const [departments, setDepartments] = useState<string[] | null>(null);
     const [loadingDepartments, setLoadingDepartments] = useState(false);
+    const [residentialHallsList, setResidentialHallsList] = useState<string[] | null>(null);
+    const [loadingHalls, setLoadingHalls] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [verifyingEmail, setVerifyingEmail] = useState(false);
     const updateProfileDialogRef = useRef<HTMLDialogElement>(null);
@@ -42,7 +44,8 @@ export default function StudentProfile() {
             academicSession: "",
             residentialHall: "",
             university: "",
-            facultyType: ""
+            facultyType: "",
+            residentialType: ""
         }
     });
 
@@ -60,7 +63,8 @@ export default function StudentProfile() {
     });
 
     const selectedUniversity = useWatch({ control: controlProfile, name: "university" });
-    const facultyType = useWatch({ control: controlProfile, name: "facultyType" })
+    const facultyType = useWatch({ control: controlProfile, name: "facultyType" });
+    const residentialType = useWatch({ control: controlProfile, name: "residentialType" });
 
 
 
@@ -72,7 +76,8 @@ export default function StudentProfile() {
                 academicSession: profile.academicSession || "",
                 residentialHall: profile.residentialHall || "",
                 university: profile.university || "",
-                facultyType: ""
+                facultyType: "",
+                residentialType: ""
             });
         }
     }, [profile, resetProfile]);
@@ -117,6 +122,93 @@ export default function StudentProfile() {
         }
         loadDepartments();
     }, [selectedUniversity, setValueProfile, controlProfile, facultyType]);
+
+    useEffect(() => {
+        async function loadHalls() {
+            if (!selectedUniversity || !residentialType) {
+                setResidentialHallsList(null);
+                setValueProfile("residentialHall", "");
+                return;
+            }
+            try {
+                setLoadingHalls(true);
+                const res = await getStudyAreas({ university: selectedUniversity, locationType: residentialType });
+
+                if (res.success && res.data) {
+                    const fetchedHalls = res.data[residentialType] || res.data.hall;
+
+                    if (Array.isArray(fetchedHalls)) {
+                        setResidentialHallsList(fetchedHalls);
+
+                        const currentHallValue = controlProfile._formValues.residentialHall;
+
+                        if (currentHallValue && !fetchedHalls.includes(currentHallValue)) {
+                            setValueProfile("residentialHall", "");
+                        }
+                    } else {
+                        setResidentialHallsList([]);
+                    }
+                } else {
+                    setResidentialHallsList([]);
+                }
+            } catch (err) {
+                console.error("Error loading halls/hostels:", err);
+                setResidentialHallsList([]);
+            } finally {
+                setLoadingHalls(false);
+            }
+        }
+        loadHalls();
+    }, [selectedUniversity, setValueProfile, controlProfile, residentialType]);
+
+    useEffect(() => {
+        async function autoDetectTypes() {
+            if (!profile || !profile.university) return;
+            
+            // Auto detect facultyType
+            if (profile.department) {
+                try {
+                    const deptRes = await getStudyAreas({ university: profile.university, locationType: "department" });
+                    if (deptRes.success && deptRes.data && Array.isArray(deptRes.data.department)) {
+                        if (deptRes.data.department.includes(profile.department)) {
+                            setValueProfile("facultyType", "department");
+                        } else {
+                            const instRes = await getStudyAreas({ university: profile.university, locationType: "institute" });
+                            if (instRes.success && instRes.data && Array.isArray(instRes.data.institute)) {
+                                if (instRes.data.institute.includes(profile.department)) {
+                                    setValueProfile("facultyType", "institute");
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Error auto-detecting facultyType:", e);
+                }
+            }
+
+            // Auto detect residentialType
+            if (profile.residentialHall) {
+                try {
+                    const hallRes = await getStudyAreas({ university: profile.university, locationType: "hall" });
+                    if (hallRes.success && hallRes.data && Array.isArray(hallRes.data.hall)) {
+                        if (hallRes.data.hall.includes(profile.residentialHall)) {
+                            setValueProfile("residentialType", "hall");
+                        } else {
+                            const hostelRes = await getStudyAreas({ university: profile.university, locationType: "hostel" });
+                            if (hostelRes.success && hostelRes.data && Array.isArray(hostelRes.data.hostel)) {
+                                if (hostelRes.data.hostel.includes(profile.residentialHall)) {
+                                    setValueProfile("residentialType", "hostel");
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Error auto-detecting residentialType:", e);
+                }
+            }
+        }
+        autoDetectTypes();
+    }, [profile, setValueProfile]);
 
     useEffect(() => {
         async function loadProfile() {
@@ -617,22 +709,64 @@ export default function StudentProfile() {
 
                         <div className="space-y-1">
                             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Academic Session</label>
-                            <input
-                                type="text"
+                            <select
                                 {...registerProfile("academicSession")}
                                 className="w-full px-3.5 py-2.5 border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-secondary transition-all"
-                            />
+                            >
+                                <option value="" disabled>
+                                    Select Academic Session
+                                </option>
+                                <option value="2020-2021">2020-2021</option>
+                                <option value="2021-2022">2021-2022</option>
+                                <option value="2022-2023">2022-2023</option>
+                                <option value="2023-2024">2023-2024</option>
+                                <option value="2024-2025">2024-2025</option>
+                                <option value="2025-2026">2025-2026</option>
+                            </select>
+                        </div>
+
+                        {/* Residential Type */}
+
+                        <div className="space-y-1">
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Residential Type</label>
+
+                            <select
+                                {...registerProfile("residentialType")}
+                                className="w-full px-3.5 py-2.5 border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-secondary transition-all"
+                            >
+                                <option value="">Select Residential Type</option>
+                                <option value="hall">Residential Hall</option>
+                                <option value="hostel">Hostel</option>
+                            </select>
+
                         </div>
 
                         {/* Residential Hall / Hostel */}
 
                         <div className="space-y-1">
                             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Residential Hall / Hostel</label>
-                            <input
-                                type="text"
+                            <select
                                 {...registerProfile("residentialHall")}
-                                className="w-full px-3.5 py-2.5 border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-secondary transition-all"
-                            />
+                                disabled={loadingHalls || !selectedUniversity}
+                                className="w-full px-3.5 py-2.5 border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-secondary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <option value="" disabled>
+                                    {loadingHalls
+                                        ? "Loading halls..."
+                                        : !selectedUniversity
+                                            ? "Select a university first"
+                                            : residentialHallsList === null || (residentialHallsList.length === 0 && loadingHalls)
+                                                ? "Loading halls..."
+                                                : residentialHallsList.length === 0
+                                                    ? "No halls found"
+                                                    : "Select Hall/Hostel"}
+                                </option>
+                                {residentialHallsList?.map((hall, idx) => (
+                                    <option key={idx} value={hall}>
+                                        {hall}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
 
                         {/* Actions */}

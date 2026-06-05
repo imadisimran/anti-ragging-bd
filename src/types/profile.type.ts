@@ -22,7 +22,8 @@ export interface UpdateProfileData {
   academicSession: string;
   residentialHall: string;
   university: string;
-  facultyType: string
+  facultyType: string;
+  residentialType: string;
 }
 
 export interface GetUniversity {
