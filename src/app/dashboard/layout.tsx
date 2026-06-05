@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import NavLinkDashboard from "@/components/layout/NavLinkDashboard";
 import { 
   Home, 
   User, 
@@ -57,82 +57,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Navigation Items */}
         <nav className="flex-1 px-3 space-y-1">
-          {/* Home Link (Active) */}
-          <Link 
-            href="/dashboard"
-            className={`flex items-center gap-4 px-3 py-3 rounded bg-secondary-fixed text-on-secondary-fixed border-l-4 border-secondary transition-all nav-item ${
-              isCollapsed ? "justify-center px-0 border-l-0 border-b-4 border-secondary" : ""
-            }`}
-          >
-            <Home className="w-5 h-5 flex-shrink-0" />
-            {!isCollapsed && (
-              <span className="text-label-md font-label-md label-text whitespace-nowrap transition-opacity duration-200">
-                Home
-              </span>
-            )}
-          </Link>
+          <NavLinkDashboard href="/dashboard" isCollapsed={isCollapsed} icon={<Home className="w-5 h-5 flex-shrink-0" />}>
+            Home
+          </NavLinkDashboard>
 
-          {/* Profile Link */}
-          <Link 
-            href="#"
-            className={`flex items-center gap-4 px-3 py-3 rounded text-on-surface-variant hover:bg-surface-container transition-all nav-item ${
-              isCollapsed ? "justify-center px-0" : ""
-            }`}
-          >
-            <User className="w-5 h-5 flex-shrink-0" />
-            {!isCollapsed && (
-              <span className="text-label-md font-label-md label-text whitespace-nowrap transition-opacity duration-200">
-                Profile
-              </span>
-            )}
-          </Link>
+          <NavLinkDashboard href="/dashboard/profile" isCollapsed={isCollapsed} icon={<User className="w-5 h-5 flex-shrink-0" />}>
+            Profile
+          </NavLinkDashboard>
 
-          {/* My Posts Link */}
-          <Link 
-            href="#"
-            className={`flex items-center gap-4 px-3 py-3 rounded text-on-surface-variant hover:bg-surface-container transition-all nav-item ${
-              isCollapsed ? "justify-center px-0" : ""
-            }`}
-          >
-            <FileText className="w-5 h-5 flex-shrink-0" />
-            {!isCollapsed && (
-              <span className="text-label-md font-label-md label-text whitespace-nowrap transition-opacity duration-200">
-                My Posts
-              </span>
-            )}
-          </Link>
+          <NavLinkDashboard href="/dashboard/my-posts" isCollapsed={isCollapsed} icon={<FileText className="w-5 h-5 flex-shrink-0" />}>
+            My Posts
+          </NavLinkDashboard>
 
-          {/* Messages Link */}
-          <Link 
-            href="#"
-            className={`flex items-center gap-4 px-3 py-3 rounded text-on-surface-variant hover:bg-surface-container transition-all nav-item ${
-              isCollapsed ? "justify-center px-0" : ""
-            }`}
-          >
-            <MessageSquare className="w-5 h-5 flex-shrink-0" />
-            {!isCollapsed && (
-              <span className="text-label-md font-label-md label-text whitespace-nowrap transition-opacity duration-200">
-                Messages
-              </span>
-            )}
-          </Link>
+          <NavLinkDashboard href="#" isCollapsed={isCollapsed} icon={<MessageSquare className="w-5 h-5 flex-shrink-0" />}>
+            Messages
+          </NavLinkDashboard>
         </nav>
 
         {/* Footer Navigation */}
         <div className="px-3 border-t border-outline-variant pt-stack-lg">
-          <Link 
-            href="#"
-            className={`flex items-center gap-4 px-3 py-3 rounded text-on-surface-variant hover:bg-surface-container transition-all nav-item ${
-              isCollapsed ? "justify-center px-0" : ""
-            }`}
-          >
-            <HelpCircle className="w-5 h-5 flex-shrink-0" />
-            {!isCollapsed && (
-              <span className="text-label-md font-label-md label-text whitespace-nowrap transition-opacity duration-200">
-                Support
-              </span>
-            )}
-          </Link>
+          <NavLinkDashboard href="#" isCollapsed={isCollapsed} icon={<HelpCircle className="w-5 h-5 flex-shrink-0" />}>
+            Support
+          </NavLinkDashboard>
         </div>
       </aside>
 

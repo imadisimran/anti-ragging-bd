@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 // import { useSession } from "next-auth/react";
 
 export default function VerifyEmailPage() {
-    const [sending,setSending]=useState(false)
+    const [sending,setSending]=useState<boolean>(false)
     // console.log(useSession())
     const router=useRouter()
     const handleEmailSent=async()=>{

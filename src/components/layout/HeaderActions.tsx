@@ -1,22 +1,22 @@
 "use client"
-import { Bell, User, Settings, LogOut } from "lucide-react";
+import { Bell, User, Settings, LogOut, LayoutDashboard } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import React from "react";
 
 export default function HeaderActions() {
-    const { data: session, status } = useSession()
-    
-    if (status === "loading") {
-        return <span className="loading loading-spinner loading-md text-primary"></span>
-    }
+  const { data: session, status } = useSession()
 
-    if (status === "unauthenticated") {
-        return <Link href="/login" className="btn btn-primary">Login</Link>
-    }
+  if (status === "loading") {
+    return <span className="loading loading-spinner loading-md text-primary"></span>
+  }
 
-    const user = session?.user;
+  if (status === "unauthenticated") {
+    return <Link href="/login" className="btn btn-primary">Login</Link>
+  }
+
+  const user = session?.user;
 
   return (
     <div className="flex items-center gap-4">
@@ -43,12 +43,18 @@ export default function HeaderActions() {
         <ul tabIndex={0} className="menu menu-sm dropdown-content mt-3 z-1 p-2 shadow-2xl bg-base-100 rounded-box w-64 border border-base-200">
           <li className="px-4 py-3 border-b border-base-200 mb-2 pointer-events-none">
             <div className="flex flex-col gap-1 p-0">
-               <span className="font-bold text-base leading-none text-base-content">{user?.name || "User"}</span>
-               <span className="text-xs text-base-content/60 truncate">{user?.email}</span>
+              <span className="font-bold text-base leading-none text-base-content">{user?.name || "User"}</span>
+              <span className="text-xs text-base-content/60 truncate">{user?.email}</span>
             </div>
           </li>
           <li>
-            <Link href="/profile" className="flex items-center gap-3 py-3">
+            <Link href="/dashboard" className="flex items-center gap-3 py-3">
+              <LayoutDashboard className="w-4 h-4" />
+              Dashboard
+            </Link>
+          </li>
+          <li>
+            <Link href="/dashboard/profile" className="flex items-center gap-3 py-3">
               <User className="w-4 h-4" />
               Profile
             </Link>
@@ -61,9 +67,9 @@ export default function HeaderActions() {
           </li>
           <div className="divider my-1 opacity-50"></div>
           <li>
-            <button 
-                onClick={() => signOut()} 
-                className="flex items-center gap-3 py-3 text-error hover:bg-error/10 active:bg-error/20"
+            <button
+              onClick={() => signOut()}
+              className="flex items-center gap-3 py-3 text-error hover:bg-error/10 active:bg-error/20"
             >
               <LogOut className="w-4 h-4" />
               Logout
