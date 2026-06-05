@@ -12,21 +12,17 @@ import {
     AlertCircle
 } from "lucide-react";
 import Swal from "sweetalert2";
-import { getStudentProfile, updateStudentProfile, updateStudentPassword, StudentProfileData } from "@/actions/server/profile";
+import { getStudentProfile, updateStudentProfile, updateStudentPassword, getUniversitites, getStudyAreas } from "@/actions/server/profile";
 import { sendVerificationEmail } from "@/actions/server/email";
-import { useForm } from "react-hook-form";
-
-interface UpdateProfileData {
-    name: string;
-    department: string;
-    academicSession: string;
-    residentialHall: string;
-    university: string;
-}
+import { useForm, useWatch } from "react-hook-form";
+import { GetUniversity, StudentProfileData, UpdateProfileData } from "@/types/profile.type";
 
 export default function StudentProfile() {
     const [profile, setProfile] = useState<StudentProfileData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [universitites, setUniversitites] = useState<GetUniversity[] | null>(null);
+    const [departments, setDepartments] = useState<string[] | null>(null);
+    const [loadingDepartments, setLoadingDepartments] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [verifyingEmail, setVerifyingEmail] = useState(false);
     const updateProfileDialogRef = useRef<HTMLDialogElement>(null);
@@ -36,14 +32,17 @@ export default function StudentProfile() {
         register: registerProfile,
         handleSubmit: handleSubmitProfile,
         formState: { errors: profileErrors, isSubmitting: isSubmittingProfile },
-        reset: resetProfile
+        reset: resetProfile,
+        setValue: setValueProfile,
+        control: controlProfile
     } = useForm<UpdateProfileData>({
         defaultValues: {
             name: "",
             department: "",
             academicSession: "",
             residentialHall: "",
-            university: ""
+            university: "",
+            facultyType: ""
         }
     });
 
@@ -60,6 +59,11 @@ export default function StudentProfile() {
         }
     });
 
+    const selectedUniversity = useWatch({ control: controlProfile, name: "university" });
+    const facultyType = useWatch({ control: controlProfile, name: "facultyType" })
+
+
+
     useEffect(() => {
         if (profile) {
             resetProfile({
@@ -67,10 +71,52 @@ export default function StudentProfile() {
                 department: profile.department || "",
                 academicSession: profile.academicSession || "",
                 residentialHall: profile.residentialHall || "",
-                university: profile.university || ""
+                university: profile.university || "",
+                facultyType: ""
             });
         }
     }, [profile, resetProfile]);
+
+    useEffect(() => {
+        async function loadDepartments() {
+            if (!selectedUniversity || !facultyType) {
+                setDepartments(null);
+                // Optional: Clear the department value if requirements aren't met
+                setValueProfile("department", "");
+                return;
+            }
+            try {
+                setLoadingDepartments(true);
+                const res = await getStudyAreas({ university: selectedUniversity, locationType: facultyType });
+
+                // Ensure res.data exists before checking keys
+                if (res.success && res.data) {
+                    // Dynamically read either res.data.institute or res.data.department
+                    const fetchedDepts = res.data[facultyType] || res.data.department;
+
+                    if (Array.isArray(fetchedDepts)) {
+                        setDepartments(fetchedDepts);
+
+                        const currentDeptValue = controlProfile._formValues.department;
+
+                        if (currentDeptValue && !fetchedDepts.includes(currentDeptValue)) {
+                            setValueProfile("department", "");
+                        }
+                    } else {
+                        setDepartments([]);
+                    }
+                } else {
+                    setDepartments([]);
+                }
+            } catch (err) {
+                console.error("Error loading departments/institutes:", err);
+                setDepartments([]);
+            } finally {
+                setLoadingDepartments(false);
+            }
+        }
+        loadDepartments();
+    }, [selectedUniversity, setValueProfile, controlProfile, facultyType]);
 
     useEffect(() => {
         async function loadProfile() {
@@ -92,16 +138,15 @@ export default function StudentProfile() {
         loadProfile();
     }, []);
 
-    const handleUpdateProfile = () => {
+    const handleUpdateProfile = async () => {
         updateProfileDialogRef.current?.showModal();
+        const result = await getUniversitites()
+        if (result.success && result.data) {
+            setUniversitites(result.data);
+        }
     };
 
-    const onSubmitProfile = async (values: {
-        name: string;
-        department?: string;
-        academicSession?: string;
-        residentialHall?: string;
-    }) => {
+    const onSubmitProfile = async (values: UpdateProfileData) => {
         try {
             updateProfileDialogRef.current?.close();
 
@@ -325,10 +370,10 @@ export default function StudentProfile() {
                                 </div>
                             </div>
 
-                            {/* University Email */}
+                            {/* Email */}
                             <div className="space-y-1.5">
                                 <label className="text-label-sm font-bold text-on-surface-variant uppercase tracking-wider">
-                                    University Email
+                                    Email
                                 </label>
                                 <div className="bg-surface-container-low border border-outline-variant hover:border-secondary/40 px-4 py-2.5 rounded text-on-surface font-body-md flex items-center justify-between transition-colors duration-200">
                                     <span>{profile.email}</span>
@@ -490,6 +535,9 @@ export default function StudentProfile() {
                     </div>
 
                     <form onSubmit={handleSubmitProfile(onSubmitProfile)} className="space-y-4">
+
+                        {/* Full Name */}
+
                         <div className="space-y-1">
                             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Full Name</label>
                             <input
@@ -502,23 +550,71 @@ export default function StudentProfile() {
                             )}
                         </div>
 
-                        <div className="space-y-1">
-                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Department</label>
-                            <input
-                                type="text"
-                                {...registerProfile("department")}
-                                className="w-full px-3.5 py-2.5 border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-secondary transition-all"
-                            />
-                        </div>
+                        {/* University Name */}
 
                         <div className="space-y-1">
                             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">University Name</label>
-                            <input
-                                type="text"
+
+                            <select
                                 {...registerProfile("university")}
                                 className="w-full px-3.5 py-2.5 border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-secondary transition-all"
-                            />
+                            >
+                                <option value="" disabled>{universitites && universitites.length > 0 ? "Select University" : "Something went wrong!"}</option>
+                                {universitites?.map((uni, idx) => (
+                                    <option key={idx} value={uni.university}>
+                                        {uni.university}
+                                    </option>
+                                ))}
+                            </select>
+
                         </div>
+
+                        {/* Faculty type */}
+
+                        <div className="space-y-1">
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Faculty Type</label>
+
+                            <select
+                                {...registerProfile("facultyType")}
+                                className="w-full px-3.5 py-2.5 border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-secondary transition-all"
+                            >
+                                <option value="">Select Faculty Type</option>
+                                <option value="institute">Institute</option>
+                                <option value="department">Department</option>
+                            </select>
+
+                        </div>
+
+                        {/* Department Name */}
+                        <div className="space-y-1">
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Department</label>
+                            <select
+                                {...registerProfile("department")}
+                                disabled={loadingDepartments || !selectedUniversity}
+                                className="w-full px-3.5 py-2.5 border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-secondary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <option value="" disabled>
+                                    {loadingDepartments
+                                        ? "Loading departments..."
+                                        : !selectedUniversity
+                                            ? "Select a university first"
+                                            : departments === null || (departments.length === 0 && loadingDepartments)
+                                                ? "Loading departments..."
+                                                : departments.length === 0
+                                                    ? "No departments found"
+                                                    : "Select Department"}
+                                </option>
+                                {departments?.map((dept, idx) => (
+                                    <option key={idx} value={dept}>
+                                        {dept}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+
+                        {/* Academic Session */}
+
                         <div className="space-y-1">
                             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Academic Session</label>
                             <input
@@ -528,6 +624,8 @@ export default function StudentProfile() {
                             />
                         </div>
 
+                        {/* Residential Hall / Hostel */}
+
                         <div className="space-y-1">
                             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Residential Hall / Hostel</label>
                             <input
@@ -536,6 +634,8 @@ export default function StudentProfile() {
                                 className="w-full px-3.5 py-2.5 border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-secondary transition-all"
                             />
                         </div>
+
+                        {/* Actions */}
 
                         <div className="flex justify-end gap-3 pt-6 border-t border-outline-variant mt-6">
                             <button

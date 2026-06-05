@@ -5,25 +5,10 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { encryptData, decryptData, generateBlindIndex } from "@/lib/encryption";
 import bcrypt from "bcryptjs";
+import { unstable_cache } from "next/cache";
 
-export interface StudentProfileData {
-  name: string;
-  email: string;
-  provider: string;
-  department: string;
-  academicSession: string;
-  residentialHall: string;
-  university: string;
-  updatedAt: Date;
-  isVerified: boolean;
+import { StudentProfileData, ProfileActionResponse, UpdateProfileData, GetUniversity, GetStudyAreas } from "@/types/profile.type";
 
-}
-
-export interface ProfileActionResponse<Data = any> {
-  success: boolean;
-  message: string;
-  data?: Data;
-}
 
 /**
  * Fetch the profile of the currently logged-in student
@@ -63,13 +48,13 @@ export async function getStudentProfile(): Promise<ProfileActionResponse<Student
       data: {
         name: decryptedName,
         email: decryptedEmail,
-        provider: user.provider || "credentials",
-        department: user.department || "",
-        academicSession: user.academicSession || "",
-        residentialHall: user.residentialHall || "",
-        university: user.university || "",
-        isVerified: user.isVerified || false,
-        updatedAt: user.updatedAt || new Date(),
+        provider: user?.provider || "credentials",
+        department: user?.department || "",
+        academicSession: user?.academicSession || "",
+        residentialHall: user?.residentialHall || "",
+        university: user?.university || "",
+        isVerified: user?.isVerified || false,
+        updatedAt: user?.updatedAt || new Date(),
       }
     };
   } catch (error) {
@@ -84,19 +69,14 @@ export async function getStudentProfile(): Promise<ProfileActionResponse<Student
 /**
  * Update the profile information (excluding email/provider/password)
  */
-export async function updateStudentProfile(data: {
-  name: string;
-  department?: string;
-  academicSession?: string;
-  residentialHall?: string;
-}): Promise<ProfileActionResponse> {
+export async function updateStudentProfile(data: UpdateProfileData): Promise<ProfileActionResponse> {
   try {
     const session = await getServerSession(authOptions);
     if (!session || !session.user || !session.user.email) {
       return { success: false, message: "Unauthorized. Please log in." };
     }
 
-    const { name, department, academicSession, residentialHall } = data;
+    const { name, department, academicSession, residentialHall, university } = data;
     if (!name || !name.trim()) {
       return { success: false, message: "Name is required." };
     }
@@ -111,7 +91,8 @@ export async function updateStudentProfile(data: {
           name: encryptedName,
           department: department || "",
           academicSession: academicSession || "",
-          residentialHall: residentialHall || ""
+          residentialHall: residentialHall || "",
+          university: university || ""
         }
       }
     );
@@ -187,5 +168,75 @@ export async function updateStudentPassword(data: {
       success: false,
       message: error instanceof Error ? error.message : "Failed to update password."
     };
+  }
+}
+
+
+const fetchUniversities = unstable_cache(
+  async (): Promise<GetUniversity[]> => {
+    const rawUniversities = await dbConnect(collections.UNIVERSITIES).find({}).project({ university: 1, _id: 0 }).toArray()
+    return rawUniversities.map((university) => {
+      return {
+        university: university?.university
+      }
+    })
+  },
+  ["universities-list"],
+  {
+    tags: ["universities"],
+    revalidate: 86400 // Cache for 1 day
+  }
+)
+
+export const getUniversitites = async (): Promise<ProfileActionResponse<GetUniversity[]>> => {
+  try {
+    const universities = await fetchUniversities()
+    const data = {
+      success: true,
+      message: "Universities loaded successfully",
+      data: universities
+    }
+    return data
+  } catch (error) {
+    console.error("Error in getUniversitites server action:", error);
+    const errorResponse = {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to load universities."
+    }
+    return errorResponse;
+  }
+}
+
+
+const fetchStudyAreas = unstable_cache(
+  async ({ university, locationType }: { university: string, locationType: string }): Promise<GetStudyAreas | null> => {
+    if (!university || !locationType) {
+      return null
+    }
+    const rawData = await dbConnect(collections.UNIVERSITIES).findOne({ university: university }, { projection: { [locationType]: 1, _id: 0 } }) as GetStudyAreas
+    return rawData
+  },
+  ["location-lists"],
+  {
+    tags: ["location-lists"],
+    revalidate: 3600 // 1 hour
+  }
+)
+
+export const getStudyAreas = async ({ university, locationType }: { university: string, locationType: string }): Promise<ProfileActionResponse<GetStudyAreas | null>> => {
+  try {
+    const rawData = await fetchStudyAreas({ university, locationType })
+    const data = {
+      success: true,
+      message: "Study areas loaded successfully",
+      data: rawData
+    }
+    return data
+  } catch (error) {
+    const errorResponse = {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to load study areas."
+    }
+    return errorResponse;
   }
 }
