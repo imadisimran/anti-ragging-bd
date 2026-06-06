@@ -27,6 +27,7 @@ export default function StudentProfile() {
     const [loadingDepartments, setLoadingDepartments] = useState(false);
     const [residentialHallsList, setResidentialHallsList] = useState<string[] | null>(null);
     const [loadingHalls, setLoadingHalls] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [verifyingEmail, setVerifyingEmail] = useState(false);
     const updateProfileDialogRef = useRef<HTMLDialogElement>(null);
@@ -86,7 +87,7 @@ export default function StudentProfile() {
 
     useEffect(() => {
         async function loadDepartments() {
-            if (!selectedUniversity || !facultyType) {
+            if (!selectedUniversity || !facultyType || !isModalOpen) {
                 setDepartments(null);
                 // Optional: Clear the department value if requirements aren't met
                 setValueProfile("department", "");
@@ -185,6 +186,7 @@ export default function StudentProfile() {
     }, []);
 
     const handleUpdateProfile = async () => {
+        setIsModalOpen(true);
         updateProfileDialogRef.current?.showModal();
         const result = await getUniversitites()
         if (result.success && result.data) {
