@@ -72,12 +72,12 @@ export default function StudentProfile() {
         if (profile) {
             resetProfile({
                 name: profile.name || "",
-                department: profile.department || "",
-                academicSession: profile.academicSession || "",
-                residentialHall: profile.residentialHall || "",
-                university: profile.university || "",
-                facultyType: "",
-                residentialType: ""
+                department: profile.studentDetails?.study?.name || "",
+                academicSession: profile.studentDetails?.academicSession || "",
+                residentialHall: profile.studentDetails?.residence?.name || "",
+                university: profile.studentDetails?.university || "",
+                facultyType: profile.studentDetails?.study?.type || "",
+                residentialType: profile.studentDetails?.residence?.type || ""
             });
         }
     }, [profile, resetProfile]);
@@ -163,19 +163,19 @@ export default function StudentProfile() {
 
     useEffect(() => {
         async function autoDetectTypes() {
-            if (!profile || !profile.university) return;
+            if (!profile || !profile.studentDetails?.university) return;
             
             // Auto detect facultyType
-            if (profile.department) {
+            if (profile.studentDetails.study?.name) {
                 try {
-                    const deptRes = await getStudyAreas({ university: profile.university, locationType: "department" });
+                    const deptRes = await getStudyAreas({ university: profile.studentDetails.university, locationType: "department" });
                     if (deptRes.success && deptRes.data && Array.isArray(deptRes.data.department)) {
-                        if (deptRes.data.department.includes(profile.department)) {
+                        if (deptRes.data.department.includes(profile.studentDetails.study.name)) {
                             setValueProfile("facultyType", "department");
                         } else {
-                            const instRes = await getStudyAreas({ university: profile.university, locationType: "institute" });
+                            const instRes = await getStudyAreas({ university: profile.studentDetails.university, locationType: "institute" });
                             if (instRes.success && instRes.data && Array.isArray(instRes.data.institute)) {
-                                if (instRes.data.institute.includes(profile.department)) {
+                                if (instRes.data.institute.includes(profile.studentDetails.study.name)) {
                                     setValueProfile("facultyType", "institute");
                                 }
                             }
@@ -187,16 +187,16 @@ export default function StudentProfile() {
             }
 
             // Auto detect residentialType
-            if (profile.residentialHall) {
+            if (profile.studentDetails.residence?.name) {
                 try {
-                    const hallRes = await getStudyAreas({ university: profile.university, locationType: "hall" });
+                    const hallRes = await getStudyAreas({ university: profile.studentDetails.university, locationType: "hall" });
                     if (hallRes.success && hallRes.data && Array.isArray(hallRes.data.hall)) {
-                        if (hallRes.data.hall.includes(profile.residentialHall)) {
+                        if (hallRes.data.hall.includes(profile.studentDetails.residence.name)) {
                             setValueProfile("residentialType", "hall");
                         } else {
-                            const hostelRes = await getStudyAreas({ university: profile.university, locationType: "hostel" });
+                            const hostelRes = await getStudyAreas({ university: profile.studentDetails.university, locationType: "hostel" });
                             if (hostelRes.success && hostelRes.data && Array.isArray(hostelRes.data.hostel)) {
-                                if (hostelRes.data.hostel.includes(profile.residentialHall)) {
+                                if (hostelRes.data.hostel.includes(profile.studentDetails.residence.name)) {
                                     setValueProfile("residentialType", "hostel");
                                 }
                             }
@@ -252,7 +252,25 @@ export default function StudentProfile() {
 
             const res = await updateStudentProfile(values);
             if (res.success) {
-                setProfile(prev => prev ? { ...prev, ...values } : null);
+                setProfile(prev => {
+                    if (!prev) return null;
+                    return {
+                        ...prev,
+                        name: values.name,
+                        studentDetails: {
+                            university: values.university || "",
+                            academicSession: values.academicSession || "",
+                            study: {
+                                type: values.facultyType || "",
+                                name: values.department || ""
+                            },
+                            residence: {
+                                type: values.residentialType || "",
+                                name: values.residentialHall || ""
+                            }
+                        }
+                    };
+                });
                 Swal.fire({
                     title: "SUCCESSFUL",
                     text: "Your profile details have been updated.",
@@ -405,10 +423,10 @@ export default function StudentProfile() {
 
     const isProfileIncomplete =
         !profile.name?.trim() ||
-        !profile.department?.trim() ||
-        !profile.academicSession?.trim() ||
-        !profile.residentialHall?.trim() ||
-        !profile.university?.trim();
+        !profile.studentDetails?.study?.name?.trim() ||
+        !profile.studentDetails?.academicSession?.trim() ||
+        !profile.studentDetails?.residence?.name?.trim() ||
+        !profile.studentDetails?.university?.trim();
 
     return (
         <div className="space-y-gutter">
@@ -490,7 +508,7 @@ export default function StudentProfile() {
                                     Department
                                 </label>
                                 <div className="bg-surface-container-low border border-outline-variant hover:border-secondary/40 px-4 py-2.5 rounded text-on-surface font-body-md transition-colors duration-200">
-                                    {profile.department || <span className="text-on-surface-variant/40 italic">Not Provided</span>}
+                                    {profile.studentDetails?.study?.name || <span className="text-on-surface-variant/40 italic">Not Provided</span>}
                                 </div>
                             </div>
 
@@ -500,7 +518,7 @@ export default function StudentProfile() {
                                     Academic Session
                                 </label>
                                 <div className="bg-surface-container-low border border-outline-variant hover:border-secondary/40 px-4 py-2.5 rounded text-on-surface font-body-md transition-colors duration-200">
-                                    {profile.academicSession || <span className="text-on-surface-variant/40 italic">Not Provided</span>}
+                                    {profile.studentDetails?.academicSession || <span className="text-on-surface-variant/40 italic">Not Provided</span>}
                                 </div>
                             </div>
 
@@ -510,7 +528,7 @@ export default function StudentProfile() {
                                     University Name
                                 </label>
                                 <div className="bg-surface-container-low border border-outline-variant hover:border-secondary/40 px-4 py-2.5 rounded text-on-surface font-body-md transition-colors duration-200">
-                                    {profile.university || <span className="text-on-surface-variant/40 italic">Not Provided</span>}
+                                    {profile.studentDetails?.university || <span className="text-on-surface-variant/40 italic">Not Provided</span>}
                                 </div>
                             </div>
 
@@ -520,7 +538,7 @@ export default function StudentProfile() {
                                     Residential Hall / Hostel
                                 </label>
                                 <div className="bg-surface-container-low border border-outline-variant hover:border-secondary/40 px-4 py-2.5 rounded text-on-surface font-body-md transition-colors duration-200">
-                                    {profile.residentialHall || <span className="text-on-surface-variant/40 italic">Not Provided</span>}
+                                    {profile.studentDetails?.residence?.name || <span className="text-on-surface-variant/40 italic">Not Provided</span>}
                                 </div>
                             </div>
 

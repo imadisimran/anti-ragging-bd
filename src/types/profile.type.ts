@@ -2,12 +2,20 @@ export interface StudentProfileData {
   name: string;
   email: string;
   provider: string;
-  department: string;
-  academicSession: string;
-  residentialHall: string;
-  university: string;
   updatedAt: Date;
   isVerified: boolean;
+  studentDetails?: {
+    university: string;
+    academicSession: string;
+    study: {
+      type: string; // "department" | "institute" | ""
+      name: string;
+    };
+    residence: {
+      type: string; // "hall" | "hostel" | ""
+      name: string;
+    };
+  };
 }
 
 export interface ProfileActionResponse<Data = any> {

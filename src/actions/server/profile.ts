@@ -42,6 +42,8 @@ export async function getStudentProfile(): Promise<ProfileActionResponse<Student
       decryptedEmail = user.email || session.user.email;
     }
 
+    const studentDetails = user?.studentDetails || {};
+
     return {
       success: true,
       message: "Profile loaded successfully",
@@ -49,12 +51,20 @@ export async function getStudentProfile(): Promise<ProfileActionResponse<Student
         name: decryptedName,
         email: decryptedEmail,
         provider: user?.provider || "credentials",
-        department: user?.department || "",
-        academicSession: user?.academicSession || "",
-        residentialHall: user?.residentialHall || "",
-        university: user?.university || "",
         isVerified: user?.isVerified || false,
         updatedAt: user?.updatedAt || new Date(),
+        studentDetails: {
+          university: studentDetails.university || "",
+          academicSession: studentDetails.academicSession || "",
+          study: {
+            type: studentDetails.study?.type || "",
+            name: studentDetails.study?.name || ""
+          },
+          residence: {
+            type: studentDetails.residence?.type || "",
+            name: studentDetails.residence?.name || ""
+          }
+        }
       }
     };
   } catch (error) {
@@ -76,7 +86,7 @@ export async function updateStudentProfile(data: UpdateProfileData): Promise<Pro
       return { success: false, message: "Unauthorized. Please log in." };
     }
 
-    const { name, department, academicSession, residentialHall, university } = data;
+    const { name, department, academicSession, residentialHall, university, facultyType, residentialType } = data;
     if (!name || !name.trim()) {
       return { success: false, message: "Name is required." };
     }
@@ -89,10 +99,18 @@ export async function updateStudentProfile(data: UpdateProfileData): Promise<Pro
       {
         $set: {
           name: encryptedName,
-          department: department || "",
-          academicSession: academicSession || "",
-          residentialHall: residentialHall || "",
-          university: university || ""
+          studentDetails: {
+            university: university || "",
+            academicSession: academicSession || "",
+            study: {
+              type: facultyType || "",
+              name: department || ""
+            },
+            residence: {
+              type: residentialType || "",
+              name: residentialHall || ""
+            }
+          }
         }
       }
     );
