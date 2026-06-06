@@ -18,6 +18,36 @@ import { useForm, useWatch } from "react-hook-form";
 import { GetUniversity, StudentProfileData, UpdateProfileData } from "@/types/profile.type";
 import { useSession } from "next-auth/react";
 
+interface PlaceholderTextProps {
+    isLoading: boolean;
+    university: string;
+    type: string;
+    typeLabel: string;
+    items: string[] | null;
+    singularMap: Record<string, string>;
+    pluralMap: Record<string, string>;
+}
+
+const getPlaceholderText = ({
+    isLoading,
+    university,
+    type,
+    typeLabel,
+    items,
+    singularMap,
+    pluralMap,
+}: PlaceholderTextProps): string => {
+    const singular = singularMap[type] || "Item";
+    const plural = pluralMap[type] || "items";
+
+    if (isLoading) return `Loading ${plural}...`;
+    if (!university) return "Select a university first";
+    if (!type) return `Select a ${typeLabel} first`;
+    if (items === null || (items.length === 0 && isLoading)) return `Loading ${plural}...`;
+    if (items.length === 0) return `No ${plural} found`;
+    return `Select ${singular}`;
+};
+
 export default function StudentProfile() {
     const { update: updateSession } = useSession();
     const [profile, setProfile] = useState<StudentProfileData | null>(null);
@@ -89,8 +119,6 @@ export default function StudentProfile() {
         async function loadDepartments() {
             if (!selectedUniversity || !facultyType || !isModalOpen) {
                 setDepartments(null);
-                // Optional: Clear the department value if requirements aren't met
-                setValueProfile("department", "");
                 return;
             }
             try {
@@ -124,13 +152,12 @@ export default function StudentProfile() {
             }
         }
         loadDepartments();
-    }, [selectedUniversity, setValueProfile, controlProfile, facultyType]);
+    }, [selectedUniversity, setValueProfile, controlProfile, facultyType, isModalOpen]);
 
     useEffect(() => {
         async function loadHalls() {
-            if (!selectedUniversity || !residentialType) {
+            if (!selectedUniversity || !residentialType || !isModalOpen) {
                 setResidentialHallsList(null);
-                setValueProfile("residentialHall", "");
                 return;
             }
             try {
@@ -162,7 +189,7 @@ export default function StudentProfile() {
             }
         }
         loadHalls();
-    }, [selectedUniversity, setValueProfile, controlProfile, residentialType]);
+    }, [selectedUniversity, setValueProfile, controlProfile, residentialType, isModalOpen]);
 
 
     useEffect(() => {
@@ -661,17 +688,15 @@ export default function StudentProfile() {
                                 className="w-full px-3.5 py-2.5 border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-secondary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <option value="" disabled>
-                                    {loadingDepartments
-                                        ? "Loading departments..."
-                                        : !selectedUniversity
-                                            ? "Select a university first"
-                                            : !facultyType // Add this check right here
-                                                ? "Select a faculty type first"
-                                                : departments === null || (departments.length === 0 && loadingDepartments)
-                                                    ? "Loading departments..."
-                                                    : departments.length === 0
-                                                        ? "No departments found"
-                                                        : "Select Department"}
+                                    {getPlaceholderText({
+                                        isLoading: loadingDepartments,
+                                        university: selectedUniversity,
+                                        type: facultyType,
+                                        typeLabel: "faculty type",
+                                        items: departments,
+                                        singularMap: { institute: "Institute", department: "Department" },
+                                        pluralMap: { institute: "institutes", department: "departments" }
+                                    })}
                                 </option>
                                 {departments?.map((dept, idx) => (
                                     <option key={idx} value={dept}>
@@ -728,17 +753,15 @@ export default function StudentProfile() {
                                 className="w-full px-3.5 py-2.5 border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-secondary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <option value="" disabled>
-                                    {loadingHalls
-                                        ? "Loading halls..."
-                                        : !selectedUniversity
-                                            ? "Select a university first"
-                                            : !residentialType // Add this check right here
-                                                ? "Select a residential type first"
-                                                : residentialHallsList === null || (residentialHallsList.length === 0 && loadingHalls)
-                                                    ? "Loading halls..."
-                                                    : residentialHallsList.length === 0
-                                                        ? "No halls found"
-                                                        : "Select Hall/Hostel"}
+                                    {getPlaceholderText({
+                                        isLoading: loadingHalls,
+                                        university: selectedUniversity,
+                                        type: residentialType,
+                                        typeLabel: "residential type",
+                                        items: residentialHallsList,
+                                        singularMap: { hostel: "Hostel", hall: "Hall" },
+                                        pluralMap: { hostel: "hostels", hall: "halls" }
+                                    })}
                                 </option>
                                 {residentialHallsList?.map((hall, idx) => (
                                     <option key={idx} value={hall}>

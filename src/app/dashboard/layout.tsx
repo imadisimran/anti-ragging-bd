@@ -12,6 +12,7 @@ import {
   ChevronLeft, 
   ChevronRight 
 } from "lucide-react";
+import Link from "next/link";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -40,7 +41,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             {!isCollapsed && (
               <div className="logo-text whitespace-nowrap transition-opacity duration-200">
-                <h2 className="text-label-md font-bold text-primary">National Portal</h2>
+                <h2 className="text-label-md font-bold text-primary">Anti Ragging BD</h2>
                 <p className="text-xs text-on-surface-variant">Safety Hub</p>
               </div>
             )}
@@ -79,6 +80,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <NavLinkDashboard href="#" isCollapsed={isCollapsed} icon={<HelpCircle className="w-5 h-5 flex-shrink-0" />}>
             Support
           </NavLinkDashboard>
+          <Link href="/" className="text-label-md font-label-md label-text">Back To Home</Link>
         </div>
       </aside>
 
