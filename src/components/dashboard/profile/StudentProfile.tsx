@@ -161,54 +161,6 @@ export default function StudentProfile() {
         loadHalls();
     }, [selectedUniversity, setValueProfile, controlProfile, residentialType]);
 
-    useEffect(() => {
-        async function autoDetectTypes() {
-            if (!profile || !profile.studentDetails?.university) return;
-            
-            // Auto detect facultyType
-            if (profile.studentDetails.study?.name) {
-                try {
-                    const deptRes = await getStudyAreas({ university: profile.studentDetails.university, locationType: "department" });
-                    if (deptRes.success && deptRes.data && Array.isArray(deptRes.data.department)) {
-                        if (deptRes.data.department.includes(profile.studentDetails.study.name)) {
-                            setValueProfile("facultyType", "department");
-                        } else {
-                            const instRes = await getStudyAreas({ university: profile.studentDetails.university, locationType: "institute" });
-                            if (instRes.success && instRes.data && Array.isArray(instRes.data.institute)) {
-                                if (instRes.data.institute.includes(profile.studentDetails.study.name)) {
-                                    setValueProfile("facultyType", "institute");
-                                }
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.error("Error auto-detecting facultyType:", e);
-                }
-            }
-
-            // Auto detect residentialType
-            if (profile.studentDetails.residence?.name) {
-                try {
-                    const hallRes = await getStudyAreas({ university: profile.studentDetails.university, locationType: "hall" });
-                    if (hallRes.success && hallRes.data && Array.isArray(hallRes.data.hall)) {
-                        if (hallRes.data.hall.includes(profile.studentDetails.residence.name)) {
-                            setValueProfile("residentialType", "hall");
-                        } else {
-                            const hostelRes = await getStudyAreas({ university: profile.studentDetails.university, locationType: "hostel" });
-                            if (hostelRes.success && hostelRes.data && Array.isArray(hostelRes.data.hostel)) {
-                                if (hostelRes.data.hostel.includes(profile.studentDetails.residence.name)) {
-                                    setValueProfile("residentialType", "hostel");
-                                }
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.error("Error auto-detecting residentialType:", e);
-                }
-            }
-        }
-        autoDetectTypes();
-    }, [profile, setValueProfile]);
 
     useEffect(() => {
         async function loadProfile() {
@@ -695,9 +647,9 @@ export default function StudentProfile() {
 
                         </div>
 
-                        {/* Department Name */}
+                        {/* Faculty Name */}
                         <div className="space-y-1">
-                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Department</label>
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">{facultyType === "institute" ? "Institute" : "Department"}</label>
                             <select
                                 {...registerProfile("department")}
                                 disabled={loadingDepartments || !selectedUniversity}
@@ -708,11 +660,13 @@ export default function StudentProfile() {
                                         ? "Loading departments..."
                                         : !selectedUniversity
                                             ? "Select a university first"
-                                            : departments === null || (departments.length === 0 && loadingDepartments)
-                                                ? "Loading departments..."
-                                                : departments.length === 0
-                                                    ? "No departments found"
-                                                    : "Select Department"}
+                                            : !facultyType // Add this check right here
+                                                ? "Select a faculty type first"
+                                                : departments === null || (departments.length === 0 && loadingDepartments)
+                                                    ? "Loading departments..."
+                                                    : departments.length === 0
+                                                        ? "No departments found"
+                                                        : "Select Department"}
                                 </option>
                                 {departments?.map((dept, idx) => (
                                     <option key={idx} value={dept}>
@@ -773,11 +727,13 @@ export default function StudentProfile() {
                                         ? "Loading halls..."
                                         : !selectedUniversity
                                             ? "Select a university first"
-                                            : residentialHallsList === null || (residentialHallsList.length === 0 && loadingHalls)
-                                                ? "Loading halls..."
-                                                : residentialHallsList.length === 0
-                                                    ? "No halls found"
-                                                    : "Select Hall/Hostel"}
+                                            : !residentialType // Add this check right here
+                                                ? "Select a residential type first"
+                                                : residentialHallsList === null || (residentialHallsList.length === 0 && loadingHalls)
+                                                    ? "Loading halls..."
+                                                    : residentialHallsList.length === 0
+                                                        ? "No halls found"
+                                                        : "Select Hall/Hostel"}
                                 </option>
                                 {residentialHallsList?.map((hall, idx) => (
                                     <option key={idx} value={hall}>
