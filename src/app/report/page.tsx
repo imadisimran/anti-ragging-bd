@@ -4,6 +4,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { CloudUpload, X, ShieldAlert, AlertTriangle, UserCheck, ArrowRight } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Swal from "sweetalert2";
 import { aiVerification, getLocation, postReport } from "@/actions/server/reportForm";
 
 interface ReportFormInputs {
@@ -25,7 +26,7 @@ export default function ReportPage() {
       locationCategory: "",
       specificLocation: ""
     }
-  }); 
+  });
 
   const locationCategory = useWatch({ name: "locationCategory", control })
   const university = useWatch({ name: "university", control })
@@ -92,24 +93,59 @@ export default function ReportPage() {
   }, [university, locationCategory]);
 
 
-  const handlePostReport = async(data: ReportFormInputs) => {
-    const formData = new FormData();
-    formData.append("university", data.university);
-    formData.append("dateTime", new Date(data.dateTime).toISOString());
-    formData.append("harassmentType", data.harassmentType);
-    formData.append("locationCategory", data.locationCategory);
-    formData.append("specificLocation", data.specificLocation);
-    formData.append("narrative", data.narrative);
+  const handlePostReport = async (data: ReportFormInputs) => {
+    try {
+      Swal.fire({
+        title: "Submitting...",
+        text: "Encrypting narrative and uploading proof files, please wait.",
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
 
-    if (data.proofFiles) {
-      Array.from(data.proofFiles).forEach((file) => {
-        formData.append("proofFiles", file);
+      const formData = new FormData();
+      formData.append("university", data.university);
+      formData.append("dateTime", new Date(data.dateTime).toISOString());
+      formData.append("harassmentType", data.harassmentType);
+      formData.append("locationCategory", data.locationCategory);
+      formData.append("specificLocation", data.specificLocation);
+      formData.append("narrative", data.narrative);
+
+      if (data.proofFiles) {
+        Array.from(data.proofFiles).forEach((file) => {
+          formData.append("proofFiles", file);
+        });
+      }
+
+      const result = await postReport(formData);
+
+      if (result.success) {
+        Swal.fire({
+          title: "SUCCESSFUL",
+          text: "Your anonymous report has been successfully encrypted and submitted.",
+          icon: "success",
+          confirmButtonColor: "var(--color-primary, #000000)"
+        }).then(() => {
+          router.push("/dashboard/my-posts");
+        });
+      } else {
+        Swal.fire({
+          title: "FAILED",
+          text: result.message || "Failed to submit report.",
+          icon: "error",
+          confirmButtonColor: "var(--color-primary, #000000)"
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      Swal.fire({
+        title: "ERROR",
+        text: "An unexpected error occurred.",
+        icon: "error",
+        confirmButtonColor: "var(--color-primary, #000000)"
       });
     }
-    
-    const result = await postReport(formData)
-    const ai=await aiVerification(data.narrative)
-    
   };
 
   if (status === "loading") {
@@ -130,7 +166,7 @@ export default function ReportPage() {
         {/* Warning Panel */}
         <div className="bg-white rounded-2xl border border-outline-variant shadow-xl overflow-hidden relative transition-all duration-300 hover:shadow-2xl">
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-error via-warning to-secondary"></div>
-          
+
           <div className="p-8 space-y-6">
             <div className="flex items-center gap-4 text-error">
               <div className="bg-error-container/40 p-3 rounded-2xl text-error shrink-0">
@@ -149,13 +185,12 @@ export default function ReportPage() {
             {/* Prerequisites Status List */}
             <div className="space-y-4">
               <h3 className="text-label-sm font-bold text-outline uppercase tracking-wider">Verification Checklist</h3>
-              
+
               {/* Prerequisite 1: Institutional Profile */}
-              <div className={`p-4 rounded-xl border transition-colors flex items-center justify-between gap-4 ${
-                isProfileComplete 
-                  ? "bg-success/5 border-success/20 text-success" 
-                  : "bg-error/5 border-error/20 text-error"
-              }`}>
+              <div className={`p-4 rounded-xl border transition-colors flex items-center justify-between gap-4 ${isProfileComplete
+                ? "bg-success/5 border-success/20 text-success"
+                : "bg-error/5 border-error/20 text-error"
+                }`}>
                 <div className="flex items-start gap-3">
                   <div className={`p-2 rounded-lg shrink-0 ${isProfileComplete ? "bg-success/10 text-success" : "bg-error/10 text-error"}`}>
                     {isProfileComplete ? <UserCheck className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
@@ -163,8 +198,8 @@ export default function ReportPage() {
                   <div>
                     <h4 className={`text-label-md font-bold ${isProfileComplete ? "text-success" : "text-primary"}`}>Institutional Profile Details</h4>
                     <p className="text-body-sm text-on-surface-variant mt-0.5">
-                      {isProfileComplete 
-                        ? "Your university, department, session, and residential details are complete." 
+                      {isProfileComplete
+                        ? "Your university, department, session, and residential details are complete."
                         : "University, department, session, or residential information is missing."}
                     </p>
                   </div>
@@ -175,11 +210,10 @@ export default function ReportPage() {
               </div>
 
               {/* Prerequisite 2: Email Verification */}
-              <div className={`p-4 rounded-xl border transition-colors flex items-center justify-between gap-4 ${
-                isVerified 
-                  ? "bg-success/5 border-success/20 text-success" 
-                  : "bg-error/5 border-error/20 text-error"
-              }`}>
+              <div className={`p-4 rounded-xl border transition-colors flex items-center justify-between gap-4 ${isVerified
+                ? "bg-success/5 border-success/20 text-success"
+                : "bg-error/5 border-error/20 text-error"
+                }`}>
                 <div className="flex items-start gap-3">
                   <div className={`p-2 rounded-lg shrink-0 ${isVerified ? "bg-success/10 text-success" : "bg-error/10 text-error"}`}>
                     {isVerified ? <UserCheck className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
@@ -187,8 +221,8 @@ export default function ReportPage() {
                   <div>
                     <h4 className={`text-label-md font-bold ${isVerified ? "text-success" : "text-primary"}`}>Identity Verification</h4>
                     <p className="text-body-sm text-on-surface-variant mt-0.5">
-                      {isVerified 
-                        ? "Your institutional email has been successfully verified." 
+                      {isVerified
+                        ? "Your institutional email has been successfully verified."
                         : "Your email is unverified. Verification is required to confirm student status."}
                     </p>
                   </div>
@@ -326,10 +360,10 @@ export default function ReportPage() {
                 disabled={!university || !locationCategory}
               >
                 <option value="" disabled>
-                  {!university 
-                    ? "Select University First" 
-                    : locationCategory 
-                      ? `Select ${locationCategory}` 
+                  {!university
+                    ? "Select University First"
+                    : locationCategory
+                      ? `Select ${locationCategory}`
                       : "Select Category First"}
                 </option>
                 {specificLocations.map((l, i) => (
@@ -359,11 +393,10 @@ export default function ReportPage() {
               rows={6}
               {...register("narrative", { required: "Detailed account is required" })}
               placeholder="Describe the event with as much detail as possible. Avoid mentioning your own name if you wish to remain fully anonymous."
-              className={`w-full p-4 bg-white border rounded-md focus:ring-2 outline-none text-body-md resize-none transition-all text-on-surface ${
-                errors.narrative 
-                  ? "border-error focus:ring-error/20 focus:border-error" 
-                  : "border-outline-variant focus:ring-secondary/20 focus:border-secondary"
-              }`}
+              className={`w-full p-4 bg-white border rounded-md focus:ring-2 outline-none text-body-md resize-none transition-all text-on-surface ${errors.narrative
+                ? "border-error focus:ring-error/20 focus:border-error"
+                : "border-outline-variant focus:ring-secondary/20 focus:border-secondary"
+                }`}
             />
             {errors.narrative && (
               <p className="text-[11px] text-error font-medium mt-1">{errors.narrative.message}</p>
@@ -383,11 +416,10 @@ export default function ReportPage() {
             <h2 className="text-headline-sm text-primary font-bold">Proof & Documentation</h2>
           </div>
           <div className="space-y-4">
-            <label className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center bg-surface-container-low hover:bg-surface-container focus-within:ring-2 outline-none transition-all cursor-pointer group ${
-              errors.proofFiles 
-                ? "border-error focus-within:ring-error/20 focus-within:border-error" 
-                : "border-outline-variant focus-within:border-secondary focus-within:ring-secondary/20"
-            }`}>
+            <label className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center bg-surface-container-low hover:bg-surface-container focus-within:ring-2 outline-none transition-all cursor-pointer group ${errors.proofFiles
+              ? "border-error focus-within:ring-error/20 focus-within:border-error"
+              : "border-outline-variant focus-within:border-secondary focus-within:ring-secondary/20"
+              }`}>
               <CloudUpload className="w-12 h-12 text-outline group-hover:text-secondary transition-colors" />
               <p className="mt-4 text-label-md font-bold text-on-surface">Drag and drop files here</p>
               <p className="text-body-md text-on-surface-variant">or click to browse from your device</p>
