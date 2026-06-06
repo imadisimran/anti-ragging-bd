@@ -1,7 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useForm, useWatch } from "react-hook-form";
-import { CloudUpload, X } from "lucide-react";
+import { CloudUpload, X, ShieldAlert, AlertTriangle, UserCheck, ArrowRight } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { aiVerification, getLocation, postReport } from "@/actions/server/reportForm";
 
 interface ReportFormInputs {
@@ -15,6 +17,9 @@ interface ReportFormInputs {
 }
 
 export default function ReportPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
   const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<ReportFormInputs>({
     defaultValues: {
       locationCategory: "",
@@ -106,6 +111,114 @@ export default function ReportPage() {
     const ai=await aiVerification(data.narrative)
     
   };
+
+  if (status === "loading") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-2">
+        <span className="loading loading-spinner loading-lg text-primary"></span>
+        <p className="text-on-surface-variant font-body-lg">Verifying session details...</p>
+      </div>
+    );
+  }
+
+  const isProfileComplete = session?.user?.isProfileComplete;
+  const isVerified = session?.user?.isVerified;
+
+  if (!isProfileComplete || !isVerified) {
+    return (
+      <div className="w-full max-w-2xl mx-auto py-12 px-4">
+        {/* Warning Panel */}
+        <div className="bg-white rounded-2xl border border-outline-variant shadow-xl overflow-hidden relative transition-all duration-300 hover:shadow-2xl">
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-error via-warning to-secondary"></div>
+          
+          <div className="p-8 space-y-6">
+            <div className="flex items-center gap-4 text-error">
+              <div className="bg-error-container/40 p-3 rounded-2xl text-error shrink-0">
+                <ShieldAlert className="w-8 h-8" />
+              </div>
+              <div>
+                <h2 className="text-headline-lg font-bold text-primary">Submission Blocked</h2>
+                <p className="text-body-md text-on-surface-variant mt-1">
+                  Institutional policy requires a complete and verified profile before you can file ragging reports.
+                </p>
+              </div>
+            </div>
+
+            <div className="divider opacity-50 my-2"></div>
+
+            {/* Prerequisites Status List */}
+            <div className="space-y-4">
+              <h3 className="text-label-sm font-bold text-outline uppercase tracking-wider">Verification Checklist</h3>
+              
+              {/* Prerequisite 1: Institutional Profile */}
+              <div className={`p-4 rounded-xl border transition-colors flex items-center justify-between gap-4 ${
+                isProfileComplete 
+                  ? "bg-success/5 border-success/20 text-success" 
+                  : "bg-error/5 border-error/20 text-error"
+              }`}>
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 rounded-lg shrink-0 ${isProfileComplete ? "bg-success/10 text-success" : "bg-error/10 text-error"}`}>
+                    {isProfileComplete ? <UserCheck className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <h4 className={`text-label-md font-bold ${isProfileComplete ? "text-success" : "text-primary"}`}>Institutional Profile Details</h4>
+                    <p className="text-body-sm text-on-surface-variant mt-0.5">
+                      {isProfileComplete 
+                        ? "Your university, department, session, and residential details are complete." 
+                        : "University, department, session, or residential information is missing."}
+                    </p>
+                  </div>
+                </div>
+                <div className="shrink-0 font-bold text-xs uppercase tracking-wider px-2.5 py-1 rounded bg-white shadow-sm border border-outline-variant/30">
+                  {isProfileComplete ? "Complete" : "Incomplete"}
+                </div>
+              </div>
+
+              {/* Prerequisite 2: Email Verification */}
+              <div className={`p-4 rounded-xl border transition-colors flex items-center justify-between gap-4 ${
+                isVerified 
+                  ? "bg-success/5 border-success/20 text-success" 
+                  : "bg-error/5 border-error/20 text-error"
+              }`}>
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 rounded-lg shrink-0 ${isVerified ? "bg-success/10 text-success" : "bg-error/10 text-error"}`}>
+                    {isVerified ? <UserCheck className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <h4 className={`text-label-md font-bold ${isVerified ? "text-success" : "text-primary"}`}>Identity Verification</h4>
+                    <p className="text-body-sm text-on-surface-variant mt-0.5">
+                      {isVerified 
+                        ? "Your institutional email has been successfully verified." 
+                        : "Your email is unverified. Verification is required to confirm student status."}
+                    </p>
+                  </div>
+                </div>
+                <div className="shrink-0 font-bold text-xs uppercase tracking-wider px-2.5 py-1 rounded bg-white shadow-sm border border-outline-variant/30">
+                  {isVerified ? "Verified" : "Unverified"}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 border border-outline-variant/50 rounded-xl p-4 text-body-sm text-on-surface-variant leading-relaxed">
+              <strong>Why is this required?</strong> To protect students and ensure the high credibility of anonymous filings, we must cross-reference reports with valid institutional details and verified email hashes. Your identity is still fully encrypted and anonymized during report submission.
+            </div>
+
+            {/* Redirection Button */}
+            <div className="flex justify-end pt-4 border-t border-outline-variant">
+              <button
+                type="button"
+                onClick={() => router.push("/dashboard/profile")}
+                className="flex items-center gap-2 px-6 py-3 bg-primary text-on-primary font-label-md font-bold rounded-lg hover:scale-[1.02] active:scale-95 transition-all shadow-md cursor-pointer hover:shadow-lg animate-bounce-short"
+              >
+                <span>Complete Profile Settings</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">

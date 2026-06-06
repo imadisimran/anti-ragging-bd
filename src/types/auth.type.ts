@@ -37,6 +37,7 @@ export interface DBuser {
   provider: string;
   isVerified: boolean;
   password?: string;
+  isProfileComplete?: boolean;
 }
 
 export interface LoginUserReturn {
@@ -61,6 +62,7 @@ export interface SocialUser {
   userId: string;
   provider: string;
   isVerified: boolean;
+  isProfileComplete?: boolean;
 }
 
 export interface SocialReturn {
@@ -87,6 +89,8 @@ export interface GetUserInfo {
   user?: {
     role: string;
     isVerified: boolean;
+    name?: string;
+    isProfileComplete?: boolean;
   };
 }
 

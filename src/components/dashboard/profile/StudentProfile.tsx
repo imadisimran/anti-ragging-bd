@@ -16,8 +16,10 @@ import { getStudentProfile, updateStudentProfile, updateStudentPassword, getUniv
 import { sendVerificationEmail } from "@/actions/server/email";
 import { useForm, useWatch } from "react-hook-form";
 import { GetUniversity, StudentProfileData, UpdateProfileData } from "@/types/profile.type";
+import { useSession } from "next-auth/react";
 
 export default function StudentProfile() {
+    const { update: updateSession } = useSession();
     const [profile, setProfile] = useState<StudentProfileData | null>(null);
     const [loading, setLoading] = useState(true);
     const [universitites, setUniversitites] = useState<GetUniversity[] | null>(null);
@@ -223,6 +225,7 @@ export default function StudentProfile() {
                         }
                     };
                 });
+                await updateSession();
                 Swal.fire({
                     title: "SUCCESSFUL",
                     text: "Your profile details have been updated.",

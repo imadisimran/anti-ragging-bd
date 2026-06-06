@@ -25,6 +25,7 @@ export const authOptions: NextAuthOptions = {
             userId: result.user.userId,
             role: result.user.role,
             isVerified: result?.user?.isVerified ?? false,
+            isProfileComplete: result?.user?.isProfileComplete,
           };
           return user;
         }
@@ -50,6 +51,10 @@ export const authOptions: NextAuthOptions = {
       session.user.userId = token?.userId;
       session.user.role = token?.role;
       session.user.isVerified = token?.isVerified;
+      session.user.isProfileComplete = token?.isProfileComplete;
+      if (token?.name) {
+        session.user.name = token.name;
+      }
       return session;
     },
     async jwt({ token, user, account, profile, isNewUser, trigger }) {
@@ -59,26 +64,30 @@ export const authOptions: NextAuthOptions = {
           name: user?.name || "",
           email: user?.email || "",
           provider: account?.provider,
-          isVerified: profile?.email_verified ?? false,
+          isVerified: profile?.email_verified || false,
         };
         const result = await saveSocialUser(data);
-        if (result.success) {
-          token.userId = result?.user?.userId;
-          token.role = result?.user?.role;
-          token.isVerified = result?.user?.isVerified;
+        if (result.success && result.user) {
+          token.userId = result.user.userId;
+          token.role = result.user.role;
+          token.isVerified = result.user.isVerified;
+          token.isProfileComplete = result.user.isProfileComplete;
         }
       } else if (account?.provider === "credentials") {
         token.userId = user?.userId;
         token.role = user?.role;
         token.isVerified = user?.isVerified;
+        token.isProfileComplete = user?.isProfileComplete;
       }
       if (trigger === "update") {
         // console.log("update triggered")
         const userInfo = await getUserInfo(token?.email || "");
         // console.log("UserInfo Log:", { email: token.email, userInfo })
-        if (userInfo.success) {
+        if (userInfo.success && userInfo.user) {
           token.role = userInfo?.user?.role;
           token.isVerified = userInfo?.user?.isVerified;
+          token.name = userInfo?.user?.name || token.name;
+          token.isProfileComplete = userInfo?.user?.isProfileComplete;
         }
       }
       return token;

@@ -2,7 +2,7 @@
 
 import { authOptions } from "@/lib/authOptions";
 import { collections, dbConnect } from "@/lib/dbConnect";
-import { encryptData, generateBlindIndex } from "@/lib/encryption";
+import { encryptData, decryptData, generateBlindIndex } from "@/lib/encryption";
 import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
 import { getServerSession } from "next-auth";
@@ -63,6 +63,22 @@ export const registerUser = async (data: RegisterUser): Promise<RegisterUserRetu
   }
 };
 
+const checkIsProfileComplete = (rawUser: any): boolean => {
+  let decryptedName = "";
+  try {
+    decryptedName = decryptData(rawUser.name);
+  } catch (e) {
+    decryptedName = rawUser.name || "";
+  }
+  return !!(
+    decryptedName?.trim() &&
+    rawUser.studentDetails?.university?.trim() &&
+    rawUser.studentDetails?.academicSession?.trim() &&
+    rawUser.studentDetails?.study?.name?.trim() &&
+    rawUser.studentDetails?.residence?.name?.trim()
+  );
+};
+
 export const loginUser = async (data: LoginUser): Promise<LoginUserReturn> => {
   const { email, password } = data;
   if (!email || !password) {
@@ -93,6 +109,7 @@ export const loginUser = async (data: LoginUser): Promise<LoginUserReturn> => {
       provider: rawUser.provider,
       isVerified: rawUser.isVerified,
       password: rawUser.password,
+      isProfileComplete: checkIsProfileComplete(rawUser),
     };
 
     return {
@@ -133,6 +150,7 @@ export const saveSocialUser = async (data: SocialData): Promise<SocialReturn> =>
           userId: rawUser.userId,
           provider: rawUser.provider,
           isVerified: rawUser.isVerified,
+          isProfileComplete: checkIsProfileComplete(rawUser),
           _id: rawUser._id.toString(),
         },
       };
@@ -150,6 +168,7 @@ export const saveSocialUser = async (data: SocialData): Promise<SocialReturn> =>
       userId,
       provider,
       isVerified,
+      isProfileComplete: false,
     };
 
     const result = await dbConnect(collections.USERS).insertOne(newUser);
@@ -226,11 +245,18 @@ export const getUserInfo = async (email: string): Promise<GetUserInfo> => {
     const emailSearchHash = generateBlindIndex(email);
     const rawUser = await dbConnect(collections.USERS).findOne(
       { emailSearchHash },
-      { projection: { role: 1, isVerified: 1 } }
+      { projection: { role: 1, isVerified: 1, name: 1, studentDetails: 1 } }
     );
 
     if (!rawUser) {
       return { success: false, message: "User not found" };
+    }
+
+    let decryptedName = "";
+    try {
+      decryptedName = decryptData(rawUser.name);
+    } catch (e) {
+      decryptedName = rawUser.name || "";
     }
 
     return {
@@ -239,6 +265,8 @@ export const getUserInfo = async (email: string): Promise<GetUserInfo> => {
       user: {
         role: rawUser.role,
         isVerified: rawUser.isVerified,
+        name: decryptedName,
+        isProfileComplete: checkIsProfileComplete(rawUser),
       },
     };
   } catch (error) {

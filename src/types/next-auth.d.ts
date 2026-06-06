@@ -6,6 +6,7 @@ declare module "next-auth" {
       userId?: string;
       role?: string;
       isVerified?: boolean;
+      isProfileComplete?: boolean;
     } & DefaultSession["user"];
   }
 
@@ -14,6 +15,7 @@ declare module "next-auth" {
     userId?: string;
     role?: string;
     isVerified?: boolean;
+    isProfileComplete?: boolean;
   }
 
   interface Profile {
@@ -26,5 +28,6 @@ declare module "next-auth/jwt" {
     userId?: string;
     role?: string;
     isVerified?: boolean;
+    isProfileComplete?: boolean;
   }
 }
