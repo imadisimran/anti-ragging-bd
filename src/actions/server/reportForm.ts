@@ -113,7 +113,7 @@ export const postReport = async (reportData: FormData) => {
 
         const emailSearchHash = generateBlindIndex(session?.user?.email || "")
 
-        const userId = await dbConnect(collections.USERS).findOne({ emailSearchHash }, { projection: { userId: 1 } })
+        const studentInfo = await dbConnect(collections.USERS).findOne({ emailSearchHash }, { projection: { userId: 1, studentDetails: 1 } })
 
         const payload: ReportPayload = {
             university,
@@ -131,17 +131,25 @@ export const postReport = async (reportData: FormData) => {
             status: aiResult.success ? "SUBMITTED" : "PENDING",
             sanitizedTitle: aiResult.success ? aiResult.sanitizedTitle : "",
             sanitizedDescription: aiResult.success ? aiResult.sanitizedDescription : "",
-            adminVerification: {
-                isRequested: false,
-                appealNote: "",
-                status: "",
-                adminId: "",
-                appealSubmittedAt: null,
-                adminNote: ""
-            },
+            adminVerification: null,
+            upVotesCount: 0,
+            upVotesBy: [],
             postId: nanoid(12),
-            studentEmail: emailSearchHash,
-            userId: userId ? `${userId?.userId}:${userId?._id.toString()}` : ""
+            studentDetails: {
+                studentEmail: emailSearchHash,
+                userId: studentInfo ? `${studentInfo?.userId}:${studentInfo?._id.toString()}` : "",
+                university: studentInfo?.studentDetails?.university || "",
+                academicSession: studentInfo?.studentDetails?.academicSession || "",
+            },
+            updatedAt: [
+                {
+                    timestamp: new Date(),
+                    status: aiResult.success ? "SUBMITTED" : "PENDING",
+                    verifiedBy: aiResult.success ? "Ai" : "",
+                    adminId: null,
+                    note: aiResult.rejectionReason ? aiResult.rejectionReason : null
+                }
+            ]
         };
 
         const result = await dbConnect(collections.REPORTS).insertOne(payload)

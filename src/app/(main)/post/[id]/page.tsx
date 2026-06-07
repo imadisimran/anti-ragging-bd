@@ -261,6 +261,20 @@ export default async function PostDetails({ params }: { params: Promise<{ id: st
             <label className="text-label-sm font-label-sm text-outline uppercase tracking-widest">User ID</label>
             <p className="text-body-md font-body-md text-primary font-mono break-all text-xs">{data.userId}</p>
           </div>
+          {/* Session */}
+          {data.academicSession && (
+            <div className="p-6 space-y-1">
+              <label className="text-label-sm font-label-sm text-outline uppercase tracking-widest">Session</label>
+              <p className="text-body-md font-body-md text-primary font-mono text-xs">{data.academicSession}</p>
+            </div>
+          )}
+          {/* Student University */}
+          {data.reporterUniversity && (
+            <div className="p-6 space-y-1">
+              <label className="text-label-sm font-label-sm text-outline uppercase tracking-widest">Student University</label>
+              <p className="text-body-md font-body-md text-primary text-xs">{data.reporterUniversity}</p>
+            </div>
+          )}
         </div>
       </div>
 

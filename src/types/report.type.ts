@@ -21,6 +21,8 @@ export interface ReportDetail {
         postId: string;
         userId: string;
         university: string;
+        reporterUniversity?: string;
+        academicSession?: string;
         dateTime: Date;
         harassmentType: string;
         specificLocation: string;

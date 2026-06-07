@@ -44,7 +44,7 @@ export async function getStudentReports(): Promise<StudentDashboardResponse> {
 
     const emailSearchHash = generateBlindIndex(session.user.email)
     const rawReports = await dbConnect(collections.REPORTS)
-      .find({ studentEmail: emailSearchHash })
+      .find({ "studentDetails.studentEmail": emailSearchHash })
       .toArray()
 
     const reports: StudentReport[] = rawReports.map((item) => ({
@@ -85,7 +85,7 @@ export async function getStudentReportDetail(postId: string): Promise<StudentRep
     const emailSearchHash = generateBlindIndex(session.user.email)
     const rawReport = await dbConnect(collections.REPORTS).findOne({
       postId,
-      studentEmail: emailSearchHash
+      "studentDetails.studentEmail": emailSearchHash
     })
 
     if (!rawReport) {

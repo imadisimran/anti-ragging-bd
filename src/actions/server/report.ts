@@ -4,14 +4,14 @@ import { ReportDetail, ShortReport, ShortReports } from "@/types/report.type"
 
 export const getShortReports = async (): Promise<ShortReports> => {
     try {
-        const rawData = await dbConnect(collections.REPORTS).find({ isRaggingIncident: true }, { projection: { postId: 1, sanitizedTitle: 1, sanitizedDescription: 1, dateTime: 1, location: 1, createdAt: 1, userId: 1, status: 1 } }).toArray()
+        const rawData = await dbConnect(collections.REPORTS).find({ isRaggingIncident: true }, { projection: { postId: 1, sanitizedTitle: 1, sanitizedDescription: 1, dateTime: 1, university: 1, specificLocation: 1, createdAt: 1, "studentDetails.userId": 1, status: 1 } }).toArray()
         const data: ShortReport[] = rawData.map(item => ({
             postId: item.postId,
-            userId: item.userId.split(":")[0],
+            userId: item.studentDetails?.userId ? item.studentDetails.userId.split(":")[0] : "",
             title: item.sanitizedTitle,
             description: item.sanitizedDescription,
             dateTime: item.dateTime,
-            location: item.location,
+            location: `${item.university} - ${item.specificLocation}`,
             createdAt: item.createdAt,
             status: item.status
         }))
@@ -28,8 +28,8 @@ export const getShortReports = async (): Promise<ShortReports> => {
 
 export const getDetailsReport = async (id: string): Promise<ReportDetail> => {
     try {
-        const rawReportData = await dbConnect(collections.REPORTS).findOne({ postId: id }, { projection: { university: 1, dateTime: 1, harassmentType: 1, specificLocation: 1, proofUrls: 1, createdAt: 1, detectedSeverity: 1, status: 1, sanitizedTitle: 1, sanitizedDescription: 1, postId: 1, userId: 1 } })
-        
+        const rawReportData = await dbConnect(collections.REPORTS).findOne({ postId: id }, { projection: { university: 1, dateTime: 1, harassmentType: 1, specificLocation: 1, proofUrls: 1, createdAt: 1, detectedSeverity: 1, status: 1, sanitizedTitle: 1, sanitizedDescription: 1, postId: 1, "studentDetails.userId": 1, "studentDetails.academicSession": 1, "studentDetails.university": 1 } })
+
         if (!rawReportData) {
             return { success: false, error: "Report not found." }
         }
@@ -38,8 +38,10 @@ export const getDetailsReport = async (id: string): Promise<ReportDetail> => {
             success: true,
             data: {
                 postId: rawReportData.postId || "",
-                userId: rawReportData.userId ? rawReportData.userId.split(":")[0] : "",
+                userId: rawReportData.studentDetails?.userId ? rawReportData.studentDetails.userId.split(":")[0] : "",
                 university: rawReportData.university || "",
+                reporterUniversity: rawReportData.studentDetails?.university || "",
+                academicSession: rawReportData.studentDetails?.academicSession || "",
                 dateTime: rawReportData.dateTime,
                 harassmentType: rawReportData.harassmentType || "",
                 specificLocation: rawReportData.specificLocation || "",

@@ -31,14 +31,31 @@ export interface ReportPayload {
     verifiedBy?: string;
     status: "PENDING" | "SUBMITTED" | "REJECTED";
     adminVerification: {
-        isRequested: boolean,
-        appealNote: string,
-        status: string,
-        adminId: string,
-        appealSubmittedAt: Date | null,
-        adminNote: string
+        isRequested: boolean;
+        appealNote: string;
+        status: "PENDING" | "REJECTED" | "APPROVED";
+        adminId: string;
+        appealSubmittedAt: Date | null;
+        adminNote: string;
+        resolvedAt: Date;
+        resolvedBy: string;
+    } | null;
+    postId: string;
+    studentDetails: {
+        studentEmail: string;
+        userId: string;
+        university: string;
+        academicSession: string;
     };
-    postId:string,
-    studentEmail:string,
-    userId:string
+    updatedAt: {
+        timestamp: Date;
+        status: "PENDING" | "SUBMITTED" | "REJECTED" | "RESOLVED";
+        verifiedBy: string;
+        adminId: string | null;
+        note: string | null
+
+    }[];
+    upVotesCount: number;
+    upVotesBy: string[]
+
 }
