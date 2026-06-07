@@ -20,7 +20,7 @@ import {
   Download, 
   Archive
 } from "lucide-react";
-import { MyDetailedReport } from "@/actions/server/my-reports";
+import { MyDetailedReport, submitReportAppeal } from "@/actions/server/my-reports";
 
 interface MyReportCardProps {
   report: MyDetailedReport;
@@ -30,10 +30,41 @@ interface MyReportCardProps {
 export default function MyReportCard({ report, showToast }: MyReportCardProps) {
   const [activeTab, setActiveTab] = useState<"public" | "original">("public");
   const [isAccordionOpen, setIsAccordionOpen] = useState<boolean>(false);
+  
+  // Appeal state
+  const [isAppealModalOpen, setIsAppealModalOpen] = useState<boolean>(false);
+  const [appealNote, setAppealNote] = useState<string>("");
+  const [submittingAppeal, setSubmittingAppeal] = useState<boolean>(false);
 
   // Helper to determine badge configurations based on DB model properties
   const getReportStatusConfig = (report: MyDetailedReport) => {
     if (report.isRaggingIncident === false) {
+      if (report.adminVerification?.isRequested) {
+        if (report.adminVerification.status === "PENDING") {
+          return {
+            label: "Appeal Pending",
+            badgeClass: "bg-amber-100 text-amber-800 border border-amber-200/50",
+            dotClass: "bg-amber-600",
+            isAppealPending: true
+          };
+        }
+        if (report.adminVerification.status === "REJECTED") {
+          return {
+            label: "Appeal Rejected",
+            badgeClass: "bg-error-container text-on-error-container",
+            dotClass: "bg-error",
+            isAppealRejected: true
+          };
+        }
+        if (report.adminVerification.status === "APPROVED") {
+          return {
+            label: "Resolved",
+            badgeClass: "bg-green-100 text-green-800",
+            dotClass: "bg-green-600",
+            isResolved: true
+          };
+        }
+      }
       return {
         label: "AI Rejected",
         badgeClass: "bg-error-container text-on-error-container",
@@ -76,6 +107,30 @@ export default function MyReportCard({ report, showToast }: MyReportCardProps) {
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
 
+  const handleSubmitAppeal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!appealNote.trim()) return;
+    setSubmittingAppeal(true);
+    try {
+      const res = await submitReportAppeal(report.postId, appealNote);
+      if (res.success) {
+        showToast("Human review appeal submitted successfully.");
+        setIsAppealModalOpen(false);
+        // Reload page to fetch updated statuses from server actions
+        window.location.reload();
+      } else {
+        showToast(res.error || "Failed to submit appeal.");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Network error occurred while submitting your appeal.");
+    } finally {
+      setSubmittingAppeal(false);
+    }
+  };
+
+  const isModerationFlow = config.isAiRejected || config.isAppealPending || config.isAppealRejected;
+
   return (
     <div className="bg-white border border-outline-variant rounded-lg shadow-sm overflow-hidden flex flex-col animate-fade-in">
       {/* Metadata Header */}
@@ -109,23 +164,54 @@ export default function MyReportCard({ report, showToast }: MyReportCardProps) {
         </button>
       </div>
 
-      {/* Moderation Flag Banner if AI-rejected */}
-      {config.isAiRejected && (
-        <div className="p-6 bg-error-container/10 border-b border-outline-variant">
-          <div className="flex items-start gap-3 text-error">
-            <AlertCircle className="w-6 h-6 flex-shrink-0 mt-0.5" />
+      {/* Moderation Flag / Appeal Banner */}
+      {isModerationFlow && (
+        <div className={`p-6 border-b border-outline-variant ${
+          config.isAppealPending 
+            ? "bg-amber-50/50" 
+            : "bg-error-container/10"
+        }`}>
+          <div className="flex items-start gap-3">
+            {config.isAppealPending ? (
+              <Clock className="w-6 h-6 flex-shrink-0 mt-0.5 text-amber-600 animate-pulse" />
+            ) : (
+              <AlertCircle className="w-6 h-6 flex-shrink-0 mt-0.5 text-error" />
+            )}
             <div>
-              <h4 className="text-headline-sm font-bold mb-1">Moderation Flag: AI Content Analysis</h4>
-              <p className="text-body-md text-on-surface-variant leading-relaxed">
-                {report.rejectionReason || "Automated analysis failed to verify concrete incident signals or specific location indicators required for platform verification."}
-              </p>
+              {config.isAppealPending && (
+                <>
+                  <h4 className="text-headline-sm font-bold mb-1 text-amber-800">Human Review Requested</h4>
+                  <p className="text-body-md text-on-surface-variant leading-relaxed">
+                    Appeal Note: "{report.adminVerification?.appealNote}"
+                  </p>
+                </>
+              )}
+              {config.isAppealRejected && (
+                <>
+                  <h4 className="text-headline-sm font-bold mb-1 text-error">Human Review Rejected</h4>
+                  <p className="text-body-md text-on-surface-variant leading-relaxed font-bold mb-2">
+                    Official Rejection Reason: "{report.adminVerification?.adminNote || 'No explanation provided.'}"
+                  </p>
+                  <p className="text-xs text-outline leading-relaxed">
+                    This appeal has been closed. No further appeal submissions are permitted for this report.
+                  </p>
+                </>
+              )}
+              {config.isAiRejected && (
+                <>
+                  <h4 className="text-headline-sm font-bold mb-1 text-error">Moderation Flag: AI Content Analysis</h4>
+                  <p className="text-body-md text-on-surface-variant leading-relaxed">
+                    {report.rejectionReason || "Automated analysis failed to verify concrete incident signals or specific location indicators required for platform verification."}
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
       )}
 
       {/* Narrative Staging Area: Switches between public sanitized title/desc and student original submit */}
-      {!config.isAiRejected ? (
+      {!isModerationFlow ? (
         <div className="flex flex-col border-b border-outline-variant bg-surface-container-low">
           <div className="flex border-b border-outline-variant">
             <button
@@ -171,10 +257,10 @@ export default function MyReportCard({ report, showToast }: MyReportCardProps) {
           )}
         </div>
       ) : (
-        // If AI Rejected, show the original submission directly (there's no sanitized version)
+        // If AI Rejected/Pending/Appeal Rejected, show the original submission directly (no public version)
         <div className="p-6 border-b border-outline-variant">
           <h3 className="text-headline-md text-primary font-bold mb-3">
-            {report.sanitizedTitle || "Rejected Incident Log"}
+            {report.sanitizedTitle || "Incident Log"}
           </h3>
           <p className="text-body-md text-on-surface-variant leading-relaxed">
             {report.narrative || "No narrative content submitted."}
@@ -195,7 +281,7 @@ export default function MyReportCard({ report, showToast }: MyReportCardProps) {
       )}
 
       {/* Engagement Metrics Bar */}
-      {!config.isAiRejected && (
+      {!isModerationFlow && (
         <div className="px-6 py-3 bg-surface flex flex-wrap items-center gap-8 border-b border-outline-variant">
           <div className="flex items-center gap-2 text-label-sm font-semibold text-on-surface-variant">
             <ThumbsUp className="w-[18px] h-[18px] text-secondary fill-secondary" />
@@ -211,7 +297,7 @@ export default function MyReportCard({ report, showToast }: MyReportCardProps) {
       )}
 
       {/* Accordion Proctor Office response/objection if notes exist */}
-      {report.adminVerification?.adminNote && (
+      {report.adminVerification?.adminNote && !config.isAppealRejected && (
         <div className="flex flex-col border-b border-outline-variant">
           <div className="px-6 py-4 flex gap-3">
             <button 
@@ -248,7 +334,7 @@ export default function MyReportCard({ report, showToast }: MyReportCardProps) {
         {config.isAiRejected ? (
           <>
             <button 
-              onClick={() => showToast(`Human review requested for AI-rejected Case #${report.postId}`)}
+              onClick={() => setIsAppealModalOpen(true)}
               className="bg-primary text-on-primary px-5 py-2.5 rounded font-bold text-label-md hover:opacity-90 transition-opacity flex items-center gap-2 cursor-pointer shadow-sm shadow-primary/10"
             >
               <UserCheck className="w-[18px] h-[18px]" />
@@ -260,6 +346,26 @@ export default function MyReportCard({ report, showToast }: MyReportCardProps) {
             >
               <Edit className="w-[18px] h-[18px]" />
               <span>Amend Submission</span>
+            </button>
+          </>
+        ) : config.isAppealPending ? (
+          <>
+            <button 
+              onClick={() => showToast(`Your Human review appeal is currently pending evaluation.`)}
+              className="bg-amber-600 text-white px-5 py-2.5 rounded font-bold text-label-md hover:opacity-90 transition-opacity flex items-center gap-2 cursor-pointer shadow-sm shadow-amber-500/10"
+            >
+              <Clock className="w-[18px] h-[18px]" />
+              <span>Appeal Pending Review</span>
+            </button>
+          </>
+        ) : config.isAppealRejected ? (
+          <>
+            <button 
+              disabled
+              className="bg-slate-100 text-slate-400 border border-slate-200 px-5 py-2.5 rounded font-bold text-label-md flex items-center gap-2 cursor-not-allowed"
+            >
+              <AlertCircle className="w-[18px] h-[18px]" />
+              <span>Appeal Rejected (Closed)</span>
             </button>
           </>
         ) : config.isResolved ? (
@@ -298,6 +404,46 @@ export default function MyReportCard({ report, showToast }: MyReportCardProps) {
           </>
         )}
       </div>
+
+      {/* Human Review Appeal Modal */}
+      {isAppealModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="absolute inset-0" onClick={() => setIsAppealModalOpen(false)}></div>
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 p-6 space-y-4">
+            <h3 className="text-headline-md font-bold text-primary">Request Human Review</h3>
+            <p className="text-body-md text-on-surface-variant leading-relaxed">
+              Explain why this report describes a valid ragging incident. Provide any additional context or details that the Proctor office should verify manually.
+            </p>
+            <form onSubmit={handleSubmitAppeal} className="space-y-4">
+              <textarea
+                value={appealNote}
+                onChange={(e) => setAppealNote(e.target.value)}
+                className="w-full h-32 p-3 bg-slate-50 border border-outline-variant rounded-md text-body-md focus:outline-none focus:border-primary placeholder-on-surface-variant/40"
+                placeholder="Write your explanation note here..."
+                required
+                maxLength={500}
+              />
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsAppealModalOpen(false)}
+                  className="px-4 py-2 border border-outline rounded text-label-md font-bold hover:bg-slate-50 cursor-pointer"
+                  disabled={submittingAppeal}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-primary text-on-primary px-5 py-2 rounded text-label-md font-bold hover:opacity-90 transition-opacity flex items-center gap-2 cursor-pointer shadow-sm shadow-primary/10"
+                  disabled={submittingAppeal || !appealNote.trim()}
+                >
+                  {submittingAppeal ? "Submitting..." : "Submit Appeal"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

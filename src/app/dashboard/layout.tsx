@@ -10,12 +10,16 @@ import {
   MessageSquare, 
   HelpCircle, 
   ChevronLeft, 
-  ChevronRight 
+  ChevronRight,
+  Scale
 } from "lucide-react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { data: session } = useSession();
+  const role = session?.user?.role;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -69,6 +73,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <NavLinkDashboard href="/dashboard/my-posts" isCollapsed={isCollapsed} icon={<FileText className="w-5 h-5 flex-shrink-0" />}>
             My Posts
           </NavLinkDashboard>
+
+          {role === "ADMIN" && (
+            <NavLinkDashboard href="/dashboard/appeals" isCollapsed={isCollapsed} icon={<Scale className="w-5 h-5 flex-shrink-0" />}>
+              Appeals
+            </NavLinkDashboard>
+          )}
 
           <NavLinkDashboard href="#" isCollapsed={isCollapsed} icon={<MessageSquare className="w-5 h-5 flex-shrink-0" />}>
             Messages

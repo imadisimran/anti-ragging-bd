@@ -17,147 +17,46 @@ import {
   Calendar,
   ShieldAlert,
   Users,
-  ChevronDown
+  ChevronDown,
+  Loader2,
+  AlertCircle,
+  Clock
 } from "lucide-react";
 import Swal from "sweetalert2";
+import { getAdminIncidents, getReporterBanStats, banReporter } from "@/actions/server/admin";
 
 interface Incident {
   id: string;
   timestamp: string;
   category: string;
   priority: "High" | "Medium" | "Low";
-  status: "NEW" | "INVESTIGATING" | "DISPUTED" | "RESOLVED";
+  status: "NEW" | "INVESTIGATING" | "DISPUTED" | "RESOLVED" | "REJECTED" | "PENDING" | "SUBMITTED";
   location: string;
   evidenceCount: number;
   description: string;
   verificationImage: string;
   assignedInvestigator?: string;
   disputeReason?: string;
+  isRaggingIncident?: boolean;
+  rejectionReason?: string | null;
+  adminVerification?: any;
 }
 
-const INITIAL_INCIDENTS: Incident[] = [
-  {
-    id: "#INC-94821",
-    timestamp: "May 24, 2:14 AM",
-    category: "Physical Assault",
-    priority: "High",
-    status: "NEW",
-    location: "West Wing Dormitories",
-    evidenceCount: 3,
-    description: "Incident occurred during late-night study hours. Group of seniors entered the common room and began verbal harassment, which escalated into physical intimidation. Perpetrators identified as third-year engineering students. Reporter claims several witnesses were present but afraid to intervene.",
-    verificationImage: "https://lh3.googleusercontent.com/aida-public/AB6AXuB9cdHpv3GOvl0c7q95A5k6m55Vz610w-hOG1EpEIzTCnDgOnj9Xk2pp6XRtfNooYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHYnQw0l3Hq59xYsfUTe4PA05zr-pt14q1M8Qra_vTvGZj1qKJBFLsPei6koRlJiBIWJYMBvgfijB_BW7obY5qbvrg3bX5koYd3rs8qjWyFdUCTFUFkOUETk"
-  },
-  {
-    id: "#INC-94750",
-    timestamp: "May 23, 11:45 PM",
-    category: "Verbal Abuse",
-    priority: "Medium",
-    status: "INVESTIGATING",
-    location: "Main Cafeteria",
-    evidenceCount: 1,
-    description: "Seniors made first-year students stand in a line and mock-interviewed them for hours in front of other students during dinner peak hours. Victims were forced to use derogatory terms against themselves.",
-    verificationImage: "https://lh3.googleusercontent.com/aida-public/AB6AXuB9cdHpv3GOvl0c7q95A5k6m55Vz610w-hOG1EpEIzTCnDgOnj9Xk2pp6XRtfNooYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHYnQw0l3Hq59xYsfUTe4PA05zr-pt14q1M8Qra_vTvGZj1qKJBFLsPei6koRlJiBIWJYMBvgfijB_BW7obY5qbvrg3bX5koYd3rs8qjWyFdUCTFUFkOUETk",
-    assignedInvestigator: "Dr. Syed Rafiq"
-  },
-  {
-    id: "#INC-94612",
-    timestamp: "May 23, 08:20 PM",
-    category: "Cyber Bullying",
-    priority: "Low",
-    status: "DISPUTED",
-    location: "Department Facebook Group",
-    evidenceCount: 2,
-    description: "Anonymous posts targeting specific freshmen with malicious rumours and edited photos on an unofficial Facebook page. Seniors threatening academic sabotage if reported.",
-    verificationImage: "https://lh3.googleusercontent.com/aida-public/AB6AXuB9cdHpv3GOvl0c7q95A5k6m55Vz610w-hOG1EpEIzTCnDgOnj9Xk2pp6XRtfNooYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHYnQw0l3Hq59xYsfUTe4PA05zr-pt14q1M8Qra_vTvGZj1qKJBFLsPei6koRlJiBIWJYMBvgfijB_BW7obY5qbvrg3bX5koYd3rs8qjWyFdUCTFUFkOUETk",
-    disputeReason: "Perpetrators claim the posts were satirical and not directed at any specific individual."
-  },
-  {
-    id: "#INC-94590",
-    timestamp: "May 22, 02:10 PM",
-    category: "Social Exclusion",
-    priority: "Medium",
-    status: "RESOLVED",
-    location: "Academic Building 2",
-    evidenceCount: 0,
-    description: "Freshmen in the CSE department were systematically told they cannot sit in the student lounge. The issue has been resolved after department heads issued a strict warning warning seniors.",
-    verificationImage: "https://lh3.googleusercontent.com/aida-public/AB6AXuB9cdHpv3GOvl0c7q95A5k6m55Vz610w-hOG1EpEIzTCnDgOnj9Xk2pp6XRtfNooYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHYnQw0l3Hq59xYsfUTe4PA05zr-pt14q1M8Qra_vTvGZj1qKJBFLsPei6koRlJiBIWJYMBvgfijB_BW7obY5qbvrg3bX5koYd3rs8qjWyFdUCTFUFkOUETk"
-  },
-  {
-    id: "#INC-94401",
-    timestamp: "May 22, 09:15 AM",
-    category: "Extortion",
-    priority: "High",
-    status: "INVESTIGATING",
-    location: "East Hall Room 108",
-    evidenceCount: 4,
-    description: "Seniors demanded money from first-year residential students as 'hall subscription' fee. Those who refused were threatened with eviction from their rooms.",
-    verificationImage: "https://lh3.googleusercontent.com/aida-public/AB6AXuB9cdHpv3GOvl0c7q95A5k6m55Vz610w-hOG1EpEIzTCnDgOnj9Xk2pp6XRtfNooYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHYnQw0l3Hq59xYsfUTe4PA05zr-pt14q1M8Qra_vTvGZj1qKJBFLsPei6koRlJiBIWJYMBvgfijB_BW7obY5qbvrg3bX5koYd3rs8qjWyFdUCTFUFkOUETk",
-    assignedInvestigator: "Prof. Dr. M. A. Latif"
-  },
-  {
-    id: "#INC-94320",
-    timestamp: "May 21, 04:30 PM",
-    category: "Physical Assault",
-    priority: "High",
-    status: "RESOLVED",
-    location: "Sports Ground Annex",
-    evidenceCount: 2,
-    description: "A physical altercation initiated by senior batch students during inter-department cricket practice. Strict warnings and academic probation issued to 3 students.",
-    verificationImage: "https://lh3.googleusercontent.com/aida-public/AB6AXuB9cdHpv3GOvl0c7q95A5k6m55Vz610w-hOG1EpEIzTCnDgOnj9Xk2pp6XRtfNooYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHYnQw0l3Hq59xYsfUTe4PA05zr-pt14q1M8Qra_vTvGZj1qKJBFLsPei6koRlJiBIWJYMBvgfijB_BW7obY5qbvrg3bX5koYd3rs8qjWyFdUCTFUFkOUETk"
-  },
-  {
-    id: "#INC-94280",
-    timestamp: "May 21, 10:15 AM",
-    category: "Verbal Abuse",
-    priority: "Low",
-    status: "NEW",
-    location: "Science Lab Building",
-    evidenceCount: 1,
-    description: "First-year student was shouted at and humiliated by lab assistants and senior lab partners for minor mistake in setting up equipment. Victim was made to clean the entire room.",
-    verificationImage: "https://lh3.googleusercontent.com/aida-public/AB6AXuB9cdHpv3GOvl0c7q95A5k6m55Vz610w-hOG1EpEIzTCnDgOnj9Xk2pp6XRtfNooYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHYnQw0l3Hq59xYsfUTe4PA05zr-pt14q1M8Qra_vTvGZj1qKJBFLsPei6koRlJiBIWJYMBvgfijB_BW7obY5qbvrg3bX5koYd3rs8qjWyFdUCTFUFkOUETk"
-  },
-  {
-    id: "#INC-94110",
-    timestamp: "May 20, 11:20 AM",
-    category: "Extortion",
-    priority: "Medium",
-    status: "DISPUTED",
-    location: "Auditorium Annex",
-    evidenceCount: 0,
-    description: "Forced sale of cultural night tickets. Freshmen were threatened with losing department seminar access if they did not purchase at least two premium tickets.",
-    verificationImage: "https://lh3.googleusercontent.com/aida-public/AB6AXuB9cdHpv3GOvl0c7q95A5k6m55Vz610w-hOG1EpEIzTCnDgOnj9Xk2pp6XRtfNooYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHYnQw0l3Hq59xYsfUTe4PA05zr-pt14q1M8Qra_vTvGZj1qKJBFLsPei6koRlJiBIWJYMBvgfijB_BW7obY5qbvrg3bX5koYd3rs8qjWyFdUCTFUFkOUETk",
-    disputeReason: "Seniors claim ticket sales were entirely voluntary and the proceeds support charity."
-  },
-  {
-    id: "#INC-94002",
-    timestamp: "May 19, 03:40 PM",
-    category: "Cyber Bullying",
-    priority: "Medium",
-    status: "RESOLVED",
-    location: "WhatsApp Batch Group",
-    evidenceCount: 1,
-    description: "Inappropriate memes and name-calling targeted at a quiet student in the official batch group. Group admins were warned and the offending student issued a public apology.",
-    verificationImage: "https://lh3.googleusercontent.com/aida-public/AB6AXuB9cdHpv3GOvl0c7q95A5k6m55Vz610w-hOG1EpEIzTCnDgOnj9Xk2pp6XRtfNooYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHYnQw0l3Hq59xYsfUTe4PA05zr-pt14q1M8Qra_vTvGZj1qKJBFLsPei6koRlJiBIWJYMBvgfijB_BW7obY5qbvrg3bX5koYd3rs8qjWyFdUCTFUFkOUETk"
-  },
-  {
-    id: "#INC-93910",
-    timestamp: "May 18, 08:50 PM",
-    category: "Physical Assault",
-    priority: "High",
-    status: "INVESTIGATING",
-    location: "North Wing Dormitories",
-    evidenceCount: 2,
-    description: "A freshman student was locked in a restroom for three hours by senior boarders. Verbal abuse and physical pushing reported. CCTV evidence is being collected.",
-    verificationImage: "https://lh3.googleusercontent.com/aida-public/AB6AXuB9cdHpv3GOvl0c7q95A5k6m55Vz610w-hOG1EpEIzTCnDgOnj9Xk2pp6XRtfNooYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHYnQw0l3Hq59xYsfUTe4PA05zr-pt14q1M8Qra_vTvGZj1qKJBFLsPei6koRlJiBIWJYMBvgfijB_BW7obY5qbvrg3bX5koYd3rs8qjWyFdUCTFUFkOUETk",
-    assignedInvestigator: "Dr. Syed Rafiq"
-  }
-];
-
-export default function AuthoritiesDashboardHome() {
-  const [incidents, setIncidents] = useState<Incident[]>(INITIAL_INCIDENTS);
+export default function AdminDashboardHome() {
+  const [incidents, setIncidents] = useState<Incident[]>([]);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
+  
+  // DB status loader state
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Moderation / Ban states
+  const [banHistoryCount, setBanHistoryCount] = useState<number>(0);
+  const [banReason, setBanReason] = useState<string>("");
+  const [banDuration, setBanDuration] = useState<"3" | "6" | "permanent">("3");
+  const [processingModeration, setProcessingModeration] = useState<boolean>(false);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -169,8 +68,106 @@ export default function AuthoritiesDashboardHome() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
+  const loadData = async () => {
+    try {
+      const res = await getAdminIncidents();
+      if (res.success && res.data) {
+        setIncidents(res.data as Incident[]);
+      } else {
+        setError(res.error || "Failed to load incidents data.");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("An unexpected error occurred while fetching incidents.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load incidents on mount
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Retrieve suspension count when selected incident details change
+  useEffect(() => {
+    if (selectedIncident) {
+      setProcessingModeration(true);
+      getReporterBanStats(selectedIncident.id).then((res) => {
+        if (res.success && res.banHistoryCount !== undefined) {
+          setBanHistoryCount(res.banHistoryCount);
+        }
+        setProcessingModeration(false);
+      });
+      setBanReason("");
+      setBanDuration("3");
+    }
+  }, [selectedIncident]);
+
+  const handleBanStudentClick = async () => {
+    if (!selectedIncident) return;
+    if (!banReason.trim()) {
+      Swal.fire({
+        title: "Reason Required",
+        text: "Please provide a reason/explanation for suspending the reporter.",
+        icon: "warning",
+        confirmButtonColor: "var(--color-primary, #0051d5)"
+      });
+      return;
+    }
+
+    const durationLabel = banDuration === "permanent" ? "permanently" : `for ${banDuration} months`;
+
+    Swal.fire({
+      title: "Suspend Student?",
+      text: `Are you sure you want to suspend this reporter ${durationLabel}?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, Suspend",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "var(--color-error, #ba1a1a)",
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        setProcessingModeration(true);
+        try {
+          const res = await banReporter(selectedIncident.id, banDuration, banReason);
+          if (res.success) {
+            Swal.fire({
+              title: "Student Suspended",
+              text: res.message || "Reporter suspended successfully.",
+              icon: "success",
+              timer: 2000,
+              timerProgressBar: true,
+            });
+            getReporterBanStats(selectedIncident.id).then((res) => {
+              if (res.success && res.banHistoryCount !== undefined) {
+                setBanHistoryCount(res.banHistoryCount);
+              }
+            });
+            setBanReason("");
+          } else {
+            Swal.fire({
+              title: "Error",
+              text: res.error || "Failed to suspend student.",
+              icon: "error"
+            });
+          }
+        } catch (err) {
+          console.error(err);
+          Swal.fire({
+            title: "Error",
+            text: "An unexpected error occurred.",
+            icon: "error"
+          });
+        } finally {
+          setProcessingModeration(false);
+        }
+      }
+    });
+  };
+
   // Impact Card metrics calculations
-  const totalNew = incidents.filter((i) => i.status === "NEW").length;
+  const totalPending = incidents.filter((i) => i.status === "PENDING").length;
   const totalInvestigating = incidents.filter((i) => i.status === "INVESTIGATING").length;
   const totalDisputed = incidents.filter((i) => i.status === "DISPUTED").length;
   const totalResolved = incidents.filter((i) => i.status === "RESOLVED").length;
@@ -189,8 +186,12 @@ export default function AuthoritiesDashboardHome() {
     const matchesPriority =
       priorityFilter === "All" || incident.priority === priorityFilter;
 
-    const matchesStatus =
-      statusFilter === "All" || incident.status === statusFilter;
+    let matchesStatus = false;
+    if (statusFilter === "All") {
+      matchesStatus = incident.isRaggingIncident === true;
+    } else {
+      matchesStatus = incident.status === statusFilter;
+    }
 
     return matchesSearch && matchesPriority && matchesStatus;
   });
@@ -361,6 +362,30 @@ export default function AuthoritiesDashboardHome() {
     });
   };
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
+        <Loader2 className="w-10 h-10 animate-spin text-primary" />
+        <p className="text-body-md text-on-surface-variant font-medium">Loading command center dashboard...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-[600px] mx-auto bg-error-container/10 border border-error/20 p-6 rounded-lg text-center space-y-4">
+        <AlertTriangle className="w-12 h-12 text-error mx-auto" />
+        <h3 className="text-headline-md font-bold text-error">Failed to Load Dashboard</h3>
+        <p className="text-body-md text-on-surface-variant leading-relaxed">{error}</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="bg-primary text-on-primary px-5 py-2 rounded text-label-md font-bold hover:opacity-90 transition-opacity cursor-pointer"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-stack-lg animate-in fade-in duration-300">
@@ -374,17 +399,17 @@ export default function AuthoritiesDashboardHome() {
 
       {/* 1. Top Metric Cards (Bento Style) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter mb-stack-lg">
-        {/* Unread Incidents */}
+        {/* Pending Incidents */}
         <div 
-          onClick={() => { setStatusFilter("NEW"); setCurrentPage(1); }}
-          className={`bg-white border-l-[6px] border-l-error border border-outline-variant p-5 rounded-lg shadow-sm hover:border-error transition-all group cursor-pointer hover:-translate-y-0.5 duration-200 ${statusFilter === "NEW" ? "ring-2 ring-error/50 bg-red-50/10" : ""}`}
+          onClick={() => { setStatusFilter("PENDING"); setCurrentPage(1); }}
+          className={`bg-white border-l-[6px] border-l-error border border-outline-variant p-5 rounded-lg shadow-sm hover:border-error transition-all group cursor-pointer hover:-translate-y-0.5 duration-200 ${statusFilter === "PENDING" ? "ring-2 ring-error/50 bg-red-50/10" : ""}`}
         >
           <div className="flex justify-between items-start mb-2">
             <ShieldAlert className="w-5 h-5 text-error group-hover:scale-110 transition-transform" />
-            <span className="text-label-sm font-bold text-error bg-red-100/50 px-2 py-0.5 rounded">URGENT</span>
+            <span className="text-label-sm font-bold text-error bg-red-100/50 px-2 py-0.5 rounded">PENDING</span>
           </div>
-          <p className="text-display font-display text-primary mt-2">{totalNew}</p>
-          <p className="text-label-md font-bold text-outline uppercase tracking-wider mt-1">Unread Incidents</p>
+          <p className="text-display font-display text-primary mt-2">{totalPending}</p>
+          <p className="text-label-md font-bold text-outline uppercase tracking-wider mt-1">Pending Incidents</p>
         </div>
 
         {/* Active Investigations */}
@@ -493,7 +518,7 @@ export default function AuthoritiesDashboardHome() {
                     <div className="border-t border-slate-100 pt-3">
                       <h4 className="text-label-sm font-bold text-on-surface-variant uppercase tracking-wider mb-2">Status</h4>
                       <div className="flex flex-wrap gap-2">
-                        {["All", "NEW", "INVESTIGATING", "DISPUTED", "RESOLVED"].map((s) => (
+                        {["All", "PENDING", "INVESTIGATING", "DISPUTED", "RESOLVED", "REJECTED"].map((s) => (
                           <button
                             key={s}
                             onClick={() => { setStatusFilter(s); setCurrentPage(1); }}
@@ -585,10 +610,10 @@ export default function AuthoritiesDashboardHome() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          {incident.status === "NEW" && (
+                          {(incident.status === "PENDING" || incident.status === "NEW" || incident.status === "SUBMITTED") && (
                             <>
-                              <span className="w-2.5 h-2.5 rounded-full bg-error animate-pulse"></span>
-                              <span className="text-label-sm text-error font-bold uppercase tracking-wider">NEW</span>
+                              <Clock className="w-4 h-4 text-amber-600 animate-pulse" />
+                              <span className="text-label-sm text-amber-600 font-bold uppercase tracking-wider">PENDING</span>
                             </>
                           )}
                           {incident.status === "INVESTIGATING" && (
@@ -607,6 +632,12 @@ export default function AuthoritiesDashboardHome() {
                             <>
                               <CheckCircle className="w-4 h-4 text-green-700" />
                               <span className="text-label-sm text-green-700 font-bold uppercase tracking-wider">RESOLVED</span>
+                            </>
+                          )}
+                          {incident.status === "REJECTED" && (
+                            <>
+                              <AlertCircle className="w-4 h-4 text-error" />
+                              <span className="text-label-sm text-error font-bold uppercase tracking-wider">REJECTED</span>
                             </>
                           )}
                         </div>
@@ -686,10 +717,8 @@ export default function AuthoritiesDashboardHome() {
       {/* Incident Detail Modal */}
       {isModalOpen && selectedIncident && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          {/* Modal Backdrop click listener */}
           <div className="absolute inset-0" onClick={handleCloseModal}></div>
 
-          {/* Modal Container */}
           <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
             
             {/* Modal Header */}
@@ -709,10 +738,10 @@ export default function AuthoritiesDashboardHome() {
                   {selectedIncident.priority} PRIORITY
                 </span>
                 
-                {selectedIncident.status === "NEW" && (
-                  <span className="bg-error text-white text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-wider flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping"></span>
-                    NEW
+                {(selectedIncident.status === "PENDING" || selectedIncident.status === "NEW" || selectedIncident.status === "SUBMITTED") && (
+                  <span className="bg-amber-600 text-white text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-wider flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" />
+                    PENDING
                   </span>
                 )}
                 {selectedIncident.status === "INVESTIGATING" && (
@@ -733,6 +762,12 @@ export default function AuthoritiesDashboardHome() {
                     RESOLVED
                   </span>
                 )}
+                {selectedIncident.status === "REJECTED" && (
+                  <span className="bg-error text-white text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-wider flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    REJECTED
+                  </span>
+                )}
               </div>
               <button
                 onClick={handleCloseModal}
@@ -746,7 +781,7 @@ export default function AuthoritiesDashboardHome() {
             <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 
-                {/* Left Side: Metadata and Evidence Details (1 Column) */}
+                {/* Left Side: Metadata and Evidence Details */}
                 <div className="md:col-span-1 space-y-6">
                   {/* Location Info Card */}
                   <div className="p-4 bg-slate-50 border border-outline-variant rounded-lg space-y-3">
@@ -816,15 +851,92 @@ export default function AuthoritiesDashboardHome() {
                       </p>
                     </div>
                   )}
+
+                  {/* Reporter Suspension Control Card */}
+                  <div className="p-4 bg-slate-50 border border-outline-variant rounded-lg space-y-4">
+                    <div className="flex items-center gap-2 text-outline text-label-sm font-bold uppercase tracking-wider">
+                      <ShieldAlert className="w-4 h-4 text-error" />
+                      <span>Reporter Suspension Control</span>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <span className="text-[11px] text-outline font-semibold uppercase tracking-wider">Previous Suspensions</span>
+                        <p className="text-body-md font-extrabold text-primary">{banHistoryCount} Times Banned</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[11px] text-outline font-semibold uppercase tracking-wider block">Suspension Duration</label>
+                        <select
+                          value={banDuration}
+                          onChange={(e) => setBanDuration(e.target.value as any)}
+                          className="w-full p-2 bg-white border border-outline-variant rounded text-label-sm font-bold focus:outline-none"
+                          disabled={processingModeration}
+                        >
+                          <option value="3">3 Months Suspension</option>
+                          <option value="6">6 Months Suspension</option>
+                          {banHistoryCount >= 2 && (
+                            <option value="permanent">Permanent Suspension</option>
+                          )}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[11px] text-outline font-semibold uppercase tracking-wider block">Suspension Reason</label>
+                        <input
+                          type="text"
+                          value={banReason}
+                          onChange={(e) => setBanReason(e.target.value)}
+                          placeholder="Why is this user suspended?"
+                          className="w-full p-2 bg-white border border-outline-variant rounded text-body-md focus:outline-none placeholder-on-surface-variant/40"
+                          disabled={processingModeration}
+                        />
+                      </div>
+
+                      <button
+                        onClick={handleBanStudentClick}
+                        className="w-full py-2 bg-error text-on-error font-bold text-label-md rounded hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 shadow-sm"
+                        disabled={processingModeration || !banReason.trim()}
+                      >
+                        Apply Suspension
+                      </button>
+                    </div>
+                  </div>
+
                 </div>
 
-                {/* Right Side: Description and Camera verification (2 Columns) */}
+                {/* Right Side: Description and Camera verification */}
                 <div className="md:col-span-2 space-y-6">
                   {/* Category Banner */}
                   <div>
                     <span className="text-label-sm font-bold text-outline uppercase tracking-wider">Incident Category</span>
                     <h3 className="text-headline-md font-bold text-primary mt-1">{selectedIncident.category}</h3>
                   </div>
+
+                  {/* Appeal Status Information (Read-only reference) */}
+                  {selectedIncident.adminVerification?.isRequested && (
+                    <div className="p-5 bg-amber-50/50 border border-amber-200/50 rounded-lg space-y-3 animate-fade-in">
+                      <div>
+                        <span className="text-xs font-bold text-amber-800 uppercase tracking-wider block mb-1">AI Moderation Trigger</span>
+                        <p className="text-body-md text-on-surface-variant leading-relaxed">
+                          AI Rejection Reason: <span className="font-semibold italic text-red-700">"{selectedIncident.rejectionReason || 'No specific flag description recorded'}"</span>
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-amber-800 uppercase tracking-wider block mb-1">Student Human Review Appeal Note</span>
+                        <p className="text-body-md text-on-surface font-semibold leading-relaxed italic bg-white p-3 border border-amber-200/30 rounded">
+                          &quot;{selectedIncident.adminVerification.appealNote}&quot;
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-outline uppercase tracking-wider block mb-1">Appeal Decision Status</span>
+                        <div className={`inline-block px-3 py-1 rounded text-label-sm font-bold uppercase tracking-wider ${
+                          selectedIncident.adminVerification.status === "APPROVED" ? "bg-green-100 text-green-800" : selectedIncident.adminVerification.status === "PENDING" ? "bg-amber-100 text-amber-800 animate-pulse" : "bg-red-100 text-red-800"
+                        }`}>
+                          Appeal {selectedIncident.adminVerification.status}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Description Box */}
                   <div>
@@ -884,7 +996,7 @@ export default function AuthoritiesDashboardHome() {
                     onClick={() => handleOpenInvestigation(selectedIncident.id)}
                     className="px-5 py-2.5 bg-primary text-on-primary font-bold text-label-md rounded hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-sm w-full sm:w-auto"
                   >
-                    {selectedIncident.status === "NEW" ? "Open Formal Investigation" : "Progress Investigation"}
+                    {(selectedIncident.status === "PENDING" || selectedIncident.status === "NEW" || selectedIncident.status === "SUBMITTED") ? "Open Formal Investigation" : "Progress Investigation"}
                   </button>
                 )}
               </div>

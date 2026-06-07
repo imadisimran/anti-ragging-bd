@@ -113,7 +113,14 @@ export const postReport = async (reportData: FormData) => {
 
         const emailSearchHash = generateBlindIndex(session?.user?.email || "")
 
-        const studentInfo = await dbConnect(collections.USERS).findOne({ emailSearchHash }, { projection: { userId: 1, studentDetails: 1 } })
+        const studentInfo = await dbConnect(collections.USERS).findOne({ emailSearchHash }, { projection: { userId: 1, studentDetails: 1, reportingBanUntil: 1 } })
+
+        if (studentInfo?.reportingBanUntil && new Date() < new Date(studentInfo.reportingBanUntil)) {
+            return {
+                success: false,
+                message: `Your account is temporarily suspended from submitting new reports until ${new Date(studentInfo.reportingBanUntil).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} due to safety policy violations.`
+            };
+        }
 
         const payload: ReportPayload = {
             university,

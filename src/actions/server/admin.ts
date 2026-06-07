@@ -1,0 +1,302 @@
+"use server"
+
+import { dbConnect, collections } from "@/lib/dbConnect"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/authOptions"
+import { MyDetailedReport } from "./my-reports"
+
+export interface AppealsResponse {
+  success: boolean;
+  data?: MyDetailedReport[];
+  error?: string;
+}
+
+export interface BanStatsResponse {
+  success: boolean;
+  banHistoryCount?: number;
+  error?: string;
+}
+
+export interface ModerationActionResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
+// Check if user has admin/teacher credentials
+async function verifyAdminAuth() {
+  const session = await getServerSession(authOptions)
+  if (!session || !session.user) {
+    return { authorized: false, email: null, error: "Unauthorized. Please log in." }
+  }
+  const role = session.user.role
+  if (role !== "ADMIN" && role !== "teacher") {
+    return { authorized: false, email: null, error: "Forbidden. Admin access required." }
+  }
+  return { authorized: true, email: session.user.email, error: null }
+}
+
+// Fetch all reports pending human review appeal
+export async function getAppealsList(): Promise<AppealsResponse> {
+  try {
+    const auth = await verifyAdminAuth()
+    if (!auth.authorized) {
+      return { success: false, error: auth.error || "Unauthorized" }
+    }
+
+    const rawReports = await dbConnect(collections.REPORTS)
+      .find({
+        "adminVerification.isRequested": true,
+        "adminVerification.status": "PENDING"
+      })
+      .toArray()
+
+    const reports: MyDetailedReport[] = rawReports.map((item) => ({
+      postId: item.postId || "",
+      createdAt: item.createdAt || new Date(),
+      university: item.university || "",
+      harassmentType: item.harassmentType || "",
+      specificLocation: item.specificLocation || "",
+      sanitizedTitle: item.sanitizedTitle || "",
+      sanitizedDescription: item.sanitizedDescription || "",
+      detectedSeverity: item.detectedSeverity || "LOW",
+      status: item.status || "SUBMITTED",
+      proofUrls: item.proofUrls || [],
+      dateTime: item.dateTime || new Date(),
+      isRaggingIncident: item.isRaggingIncident ?? true,
+      narrative: item.narrative || "",
+      rejectionReason: item.rejectionReason || null,
+      upVotesCount: item.upVotesCount || 0,
+      adminVerification: item.adminVerification || null,
+    }))
+
+    // Sort by appealSubmittedAt descending
+    reports.sort((a, b) => {
+      const dateA = a.adminVerification?.appealSubmittedAt ? new Date(a.adminVerification.appealSubmittedAt).getTime() : 0
+      const dateB = b.adminVerification?.appealSubmittedAt ? new Date(b.adminVerification.appealSubmittedAt).getTime() : 0
+      return dateB - dateA
+    })
+
+    return { success: true, data: reports }
+  } catch (error) {
+    console.error("Error in getAppealsList:", error)
+    return { success: false, error: "Failed to fetch appeals queue." }
+  }
+}
+
+// Approve or Reject an appeal
+export async function resolveAppeal(
+  postId: string,
+  action: "APPROVE" | "REJECT",
+  adminNote: string
+): Promise<ModerationActionResponse> {
+  try {
+    const auth = await verifyAdminAuth()
+    if (!auth.authorized) {
+      return { success: false, error: auth.error || "Unauthorized" }
+    }
+
+    const report = await dbConnect(collections.REPORTS).findOne({ postId })
+    if (!report) {
+      return { success: false, error: "Report not found." }
+    }
+
+    const isRagging = action === "APPROVE"
+    const statusVal = action === "APPROVE" ? "SUBMITTED" : "REJECTED"
+    const appealStatus = action === "APPROVE" ? "APPROVED" : "REJECTED"
+
+    const updatedVerification = {
+      ...(report.adminVerification || {}),
+      status: appealStatus,
+      adminNote: adminNote || (action === "APPROVE" ? "Appeal approved by administrator." : "Appeal rejected by administrator."),
+      resolvedAt: new Date(),
+      resolvedBy: auth.email
+    }
+
+    // Append to updatedAt log array
+    const newUpdateLog = {
+      timestamp: new Date(),
+      status: statusVal,
+      verifiedBy: "Admin",
+      adminId: auth.email,
+      note: adminNote
+    }
+
+    const result = await dbConnect(collections.REPORTS).updateOne(
+      { postId },
+      { 
+        $set: { 
+          isRaggingIncident: isRagging, 
+          status: statusVal, 
+          adminVerification: updatedVerification 
+        },
+        $push: {
+          updatedAt: newUpdateLog
+        }
+      } as any
+    )
+
+    if (result.modifiedCount > 0) {
+      return { success: true, message: `Report appeal successfully ${action.toLowerCase()}d.` }
+    }
+    return { success: false, error: "Failed to update report appeal status." }
+  } catch (error) {
+    console.error("Error in resolveAppeal server action:", error)
+    return { success: false, error: "Failed to resolve report appeal." }
+  }
+}
+
+// Fetch cumulative ban history count for a report's author
+export async function getReporterBanStats(postId: string): Promise<BanStatsResponse> {
+  try {
+    const auth = await verifyAdminAuth()
+    if (!auth.authorized) {
+      return { success: false, error: auth.error || "Unauthorized" }
+    }
+
+    const report = await dbConnect(collections.REPORTS).findOne({ postId })
+    if (!report || !report.studentDetails || !report.studentDetails.studentEmail) {
+      return { success: false, error: "Report or reporter details not found." }
+    }
+
+    const studentEmailHash = report.studentDetails.studentEmail
+    const user = await dbConnect(collections.USERS).findOne({ emailSearchHash: studentEmailHash })
+    if (!user) {
+      return { success: false, error: "Reporter user account not found." }
+    }
+
+    return { success: true, banHistoryCount: user.banHistoryCount || 0 }
+  } catch (error) {
+    console.error("Error in getReporterBanStats:", error)
+    return { success: false, error: "Failed to retrieve student ban statistics." }
+  }
+}
+
+// Ban a student reporter for 3 months, 6 months, or permanently
+export async function banReporter(
+  postId: string,
+  duration: "3" | "6" | "permanent",
+  reason: string
+): Promise<ModerationActionResponse> {
+  try {
+    const auth = await verifyAdminAuth()
+    if (!auth.authorized) {
+      return { success: false, error: auth.error || "Unauthorized" }
+    }
+
+    const report = await dbConnect(collections.REPORTS).findOne({ postId })
+    if (!report || !report.studentDetails || !report.studentDetails.studentEmail) {
+      return { success: false, error: "Report or reporter details not found." }
+    }
+
+    const studentEmailHash = report.studentDetails.studentEmail
+    const user = await dbConnect(collections.USERS).findOne({ emailSearchHash: studentEmailHash })
+    if (!user) {
+      return { success: false, error: "Reporter user account not found." }
+    }
+
+    // Double check permanent ban criteria
+    const currentBanHistory = user.banHistoryCount || 0
+    if (duration === "permanent" && currentBanHistory < 2) {
+      return { success: false, error: "Permanent suspension is only allowed for users with at least 2 previous suspensions." }
+    }
+
+    let bannedUntilDate: Date
+    const now = Date.now()
+    if (duration === "3") {
+      bannedUntilDate = new Date(now + 3 * 30 * 24 * 60 * 60 * 1000)
+    } else if (duration === "6") {
+      bannedUntilDate = new Date(now + 6 * 30 * 24 * 60 * 60 * 1000)
+    } else {
+      // Permanent suspension: 100 years into the future
+      bannedUntilDate = new Date(now + 100 * 365 * 24 * 60 * 60 * 1000)
+    }
+
+    const result = await dbConnect(collections.USERS).updateOne(
+      { emailSearchHash: studentEmailHash },
+      {
+        $set: {
+          reportingBanUntil: bannedUntilDate,
+          reportingBanReason: reason
+        },
+        $inc: {
+          banHistoryCount: 1
+        }
+      }
+    )
+
+    if (result.modifiedCount > 0) {
+      return { 
+        success: true, 
+        message: `Reporter suspended successfully. Duration: ${duration === "permanent" ? "Permanent" : `${duration} Months`}.` 
+      }
+    }
+    return { success: false, error: "Failed to apply suspension on the reporter account." }
+  } catch (error) {
+    console.error("Error in banReporter server action:", error)
+    return { success: false, error: "Failed to suspend student reporter." }
+  }
+}
+
+export interface AdminIncident {
+  id: string;
+  timestamp: string;
+  category: string;
+  priority: "High" | "Medium" | "Low";
+  status: "NEW" | "INVESTIGATING" | "DISPUTED" | "RESOLVED" | "REJECTED" | "PENDING" | "SUBMITTED";
+  location: string;
+  evidenceCount: number;
+  description: string;
+  verificationImage: string;
+  assignedInvestigator?: string;
+  disputeReason?: string;
+  isRaggingIncident: boolean;
+  rejectionReason: string | null;
+  adminVerification: any;
+}
+
+export async function getAdminIncidents(): Promise<{ success: boolean; data?: AdminIncident[]; error?: string }> {
+  try {
+    const auth = await verifyAdminAuth()
+    if (!auth.authorized) {
+      return { success: false, error: auth.error || "Unauthorized" }
+    }
+
+    const rawReports = await dbConnect(collections.REPORTS).find({}).toArray()
+
+    const data: AdminIncident[] = rawReports.map((item) => {
+      let priority: "High" | "Medium" | "Low" = "Low";
+      if (item.detectedSeverity === "HIGH") priority = "High";
+      else if (item.detectedSeverity === "MEDIUM") priority = "Medium";
+
+      const verificationImage = item.proofUrls && item.proofUrls.length > 0
+        ? item.proofUrls[0]
+        : "https://lh3.googleusercontent.com/aida-public/AB6AXuB9cdHpv3GOvl0c7q95A5k6m55Vz610w-hOG1EpEIzTCnDgOnj9Xk2pp6XRtfNooYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHYnQw0l3Hq59xYsfUTe4PA05zr-pt14q1M8Qra_vTvGZj1qKJBFLsPei6koRlJiBIWJYMBvgfijB_BW7obY5qbvrg3bX5koYd3rs8qjWyFdUCTFUFkOUETk";
+
+      return {
+        id: item.postId || "",
+        timestamp: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "",
+        category: item.harassmentType || "General Incident",
+        priority,
+        status: item.status || "NEW",
+        location: `${item.university || ""} • ${item.specificLocation || ""}`,
+        evidenceCount: item.proofUrls ? item.proofUrls.length : 0,
+        description: item.narrative || "",
+        verificationImage,
+        assignedInvestigator: item.adminVerification?.adminId || undefined,
+        disputeReason: item.adminVerification?.adminNote || undefined,
+        isRaggingIncident: item.isRaggingIncident ?? true,
+        rejectionReason: item.rejectionReason || null,
+        adminVerification: item.adminVerification || null,
+      };
+    });
+
+    // Sort by id descending
+    data.sort((a, b) => b.id.localeCompare(a.id));
+
+    return { success: true, data };
+  } catch (error) {
+    console.error("Error in getAdminIncidents server action:", error);
+    return { success: false, error: "Failed to fetch incidents list." };
+  }
+}

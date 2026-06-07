@@ -82,3 +82,69 @@ export async function getMyDetailedReports(): Promise<MyReportsResponse> {
     }
   }
 }
+
+export async function submitReportAppeal(
+  postId: string,
+  appealNote: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session || !session.user || !session.user.email) {
+      return { success: false, error: "Unauthorized. Please log in." }
+    }
+
+    const emailSearchHash = generateBlindIndex(session.user.email)
+    
+    // Find report and verify ownership
+    const report = await dbConnect(collections.REPORTS).findOne({
+      postId,
+      "studentDetails.studentEmail": emailSearchHash
+    })
+
+    if (!report) {
+      return { success: false, error: "Report not found or permission denied." }
+    }
+
+    // Verify it is in a state that can be appealed
+    if (report.isRaggingIncident === true) {
+      return { success: false, error: "This report is already active and verified." }
+    }
+
+    // Check if user already appealed
+    if (report.adminVerification?.isRequested) {
+      return { success: false, error: "An appeal has already been requested for this report." }
+    }
+
+    const appealPayload = {
+      isRequested: true,
+      appealNote,
+      status: "PENDING",
+      adminId: "",
+      appealSubmittedAt: new Date(),
+      adminNote: "",
+      resolvedAt: null,
+      resolvedBy: null
+    }
+
+    const result = await dbConnect(collections.REPORTS).updateOne(
+      { postId },
+      { 
+        $set: { 
+          adminVerification: appealPayload 
+        } 
+      }
+    )
+
+    if (result.modifiedCount > 0) {
+      return { success: true, message: "Appeal submitted successfully." }
+    }
+    return { success: false, error: "Failed to submit appeal." }
+  } catch (error) {
+    console.error("Error in submitReportAppeal server action:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to submit appeal."
+    }
+  }
+}
+

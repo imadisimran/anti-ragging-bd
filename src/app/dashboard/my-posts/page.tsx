@@ -55,6 +55,9 @@ export default function MyPostsPage() {
   // Helper to determine status category for filtering
   const getStatusCategory = (report: MyDetailedReport): string => {
     if (report.isRaggingIncident === false) {
+      if (report.adminVerification?.isRequested && report.adminVerification.status === "PENDING") {
+        return "investigating";
+      }
       return "rejected";
     }
     if (report.status === "DISPUTED" || (report.adminVerification && report.adminVerification.status === "REJECTED")) {
