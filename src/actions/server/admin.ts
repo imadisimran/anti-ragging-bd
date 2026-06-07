@@ -253,6 +253,7 @@ export interface AdminIncident {
   isRaggingIncident: boolean;
   rejectionReason: string | null;
   adminVerification: any;
+  proofUrls: string[];
 }
 
 export async function getAdminIncidents(): Promise<{ success: boolean; data?: AdminIncident[]; error?: string }> {
@@ -288,6 +289,7 @@ export async function getAdminIncidents(): Promise<{ success: boolean; data?: Ad
         isRaggingIncident: item.isRaggingIncident ?? true,
         rejectionReason: item.rejectionReason || null,
         adminVerification: item.adminVerification || null,
+        proofUrls: item.proofUrls || [],
       };
     });
 

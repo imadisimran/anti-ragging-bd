@@ -40,13 +40,57 @@ interface Incident {
   isRaggingIncident?: boolean;
   rejectionReason?: string | null;
   adminVerification?: any;
+  proofUrls?: string[];
 }
+
+const getProofType = (url: string): "image" | "video" | "audio" | "unknown" => {
+  const lowercaseUrl = url.toLowerCase();
+  if (
+    lowercaseUrl.includes("/video/upload/") ||
+    lowercaseUrl.endsWith(".mp4") ||
+    lowercaseUrl.endsWith(".webm") ||
+    lowercaseUrl.endsWith(".ogg") ||
+    lowercaseUrl.endsWith(".mov")
+  ) {
+    return "video";
+  }
+  if (
+    lowercaseUrl.includes("/image/upload/") ||
+    lowercaseUrl.endsWith(".jpg") ||
+    lowercaseUrl.endsWith(".jpeg") ||
+    lowercaseUrl.endsWith(".png") ||
+    lowercaseUrl.endsWith(".webp") ||
+    lowercaseUrl.endsWith(".gif")
+  ) {
+    return "image";
+  }
+  if (
+    lowercaseUrl.includes("/audio/upload/") ||
+    lowercaseUrl.endsWith(".mp3") ||
+    lowercaseUrl.endsWith(".wav") ||
+    lowercaseUrl.endsWith(".aac") ||
+    lowercaseUrl.endsWith(".m4a")
+  ) {
+    return "audio";
+  }
+  return "unknown";
+};
+
+const getFileName = (url: string, index: number) => {
+  const type = getProofType(url);
+  const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
+  const parts = url.split("/");
+  const lastPart = parts[parts.length - 1] || "";
+  const dotParts = lastPart.split(".");
+  const ext = dotParts.length > 1 ? `.${dotParts[dotParts.length - 1]}` : "";
+  return `proof_attachment_0${index + 1}${ext ? ext : ` (${typeLabel})`}`;
+};
 
 export default function AdminDashboardHome() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isZoomed, setIsZoomed] = useState(false);
+  const [activeProofUrl, setActiveProofUrl] = useState<string | null>(null);
   
   // DB status loader state
   const [loading, setLoading] = useState<boolean>(true);
@@ -217,7 +261,7 @@ export default function AdminDashboardHome() {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setIsZoomed(false);
+    setActiveProofUrl(null);
   };
 
   // Keyboard close modal support
@@ -807,22 +851,26 @@ export default function AdminDashboardHome() {
                       <Paperclip className="w-4 h-4 text-on-surface-variant" />
                       <span>Evidence Attachments</span>
                     </div>
-                    {selectedIncident.evidenceCount > 0 ? (
+                    {selectedIncident.proofUrls && selectedIncident.proofUrls.length > 0 ? (
                       <div className="space-y-2">
                         <p className="text-label-md font-bold text-secondary flex items-center gap-1.5">
-                          <span>{selectedIncident.evidenceCount} Files Attached</span>
+                          <span>{selectedIncident.proofUrls.length} Files Attached</span>
                         </p>
                         <ul className="text-xs text-on-surface-variant space-y-1 pl-1">
-                          {Array.from({ length: selectedIncident.evidenceCount }).map((_, idx) => (
-                            <li key={idx} className="flex items-center gap-1.5 hover:text-primary hover:underline cursor-pointer">
+                          {selectedIncident.proofUrls.map((url, idx) => (
+                            <li 
+                              key={idx} 
+                              onClick={() => setActiveProofUrl(url)}
+                              className="flex items-center gap-1.5 hover:text-primary hover:underline cursor-pointer"
+                            >
                               <Paperclip className="w-3 h-3 text-outline" />
-                              <span>verification_proof_0{idx + 1}.jpg</span>
+                              <span className="truncate flex-1">{getFileName(url, idx)}</span>
                             </li>
                           ))}
                         </ul>
                       </div>
                     ) : (
-                      <p className="text-body-md text-on-surface-variant italic">No files attached to report.</p>
+                      <p className="text-body-md text-on-surface-variant italic">No proof provided.</p>
                     )}
                   </div>
 
@@ -949,22 +997,53 @@ export default function AdminDashboardHome() {
                   {/* Verification Proof Image preview */}
                   <div>
                     <p className="text-label-sm font-bold text-outline uppercase tracking-wider mb-3">Verification Video/Image Proof</p>
-                    <div
-                      onClick={() => setIsZoomed(true)}
-                      className="relative group cursor-pointer border border-outline-variant h-64 rounded-lg overflow-hidden shadow-sm"
-                    >
-                      <img
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        alt="Grainy CCTV security monitoring capture in hallway"
-                        src={selectedIncident.verificationImage}
-                      />
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span className="bg-white/90 text-primary px-4 py-2 font-bold text-label-md flex items-center gap-2 rounded shadow">
-                          <ZoomIn className="w-4 h-4" />
-                          Zoom and Analyze Proof
-                        </span>
+                    {selectedIncident.proofUrls && selectedIncident.proofUrls.length > 0 ? (
+                      <div
+                        onClick={() => setActiveProofUrl(selectedIncident.proofUrls![0])}
+                        className="relative group cursor-pointer border border-outline-variant h-64 rounded-lg overflow-hidden shadow-sm bg-slate-100 flex items-center justify-center"
+                      >
+                        {getProofType(selectedIncident.proofUrls[0]) === "video" ? (
+                          <div className="w-full h-full bg-slate-950 flex items-center justify-center relative">
+                            <video src={selectedIncident.proofUrls[0]} className="w-full h-full object-cover opacity-60" muted />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <span className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center text-primary shadow-lg group-hover:scale-110 transition-transform">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 text-primary ml-1">
+                                  <path fillRule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clipRule="evenodd" />
+                                </svg>
+                              </span>
+                            </div>
+                          </div>
+                        ) : getProofType(selectedIncident.proofUrls[0]) === "audio" ? (
+                          <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center gap-3 relative">
+                            <Clock className="w-12 h-12 text-outline animate-pulse" />
+                            <span className="text-white text-xs font-bold uppercase tracking-wider">Audio Evidence Proof</span>
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <span className="bg-white/90 text-primary px-4 py-2 font-bold text-label-md flex items-center gap-2 rounded shadow">
+                                Play Audio Proof
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <img
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            alt="Grainy CCTV security monitoring capture in hallway"
+                            src={selectedIncident.proofUrls[0]}
+                          />
+                        )}
+                        {getProofType(selectedIncident.proofUrls[0]) === "image" && (
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="bg-white/90 text-primary px-4 py-2 font-bold text-label-md flex items-center gap-2 rounded shadow">
+                              <ZoomIn className="w-4 h-4" />
+                              Zoom and Analyze Proof
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    </div>
+                    ) : (
+                      <div className="border border-dashed border-outline-variant rounded-lg p-8 text-center text-on-surface-variant italic bg-slate-50/50">
+                        No proof provided.
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1007,23 +1086,38 @@ export default function AdminDashboardHome() {
       )}
 
       {/* Lightbox / Zoom Modal */}
-      {isZoomed && selectedIncident && (
+      {activeProofUrl && selectedIncident && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 animate-in fade-in duration-150">
           <button
-            onClick={() => setIsZoomed(false)}
+            onClick={() => setActiveProofUrl(null)}
             className="absolute top-6 right-6 p-2 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
             title="Close Zoom"
           >
             <X className="w-8 h-8" />
           </button>
           <div className="max-w-5xl w-full max-h-[85vh] relative flex flex-col items-center justify-center">
-            <img
-              className="max-w-full max-h-[80vh] object-contain rounded-lg border border-white/10 shadow-2xl"
-              alt="Zoomed surveillance capture"
-              src={selectedIncident.verificationImage}
-            />
+            {getProofType(activeProofUrl) === "video" ? (
+              <video
+                src={activeProofUrl}
+                controls
+                autoPlay
+                className="max-w-full max-h-[80vh] rounded-lg border border-white/10 shadow-2xl"
+              />
+            ) : getProofType(activeProofUrl) === "audio" ? (
+              <div className="bg-slate-900 p-8 rounded-lg border border-white/10 flex flex-col items-center gap-4 animate-in zoom-in-95 duration-200">
+                <Clock className="w-12 h-12 text-white animate-pulse" />
+                <audio src={activeProofUrl} controls autoPlay className="w-80" />
+                <span className="text-white text-xs">Audio Evidence Playback</span>
+              </div>
+            ) : (
+              <img
+                className="max-w-full max-h-[80vh] object-contain rounded-lg border border-white/10 shadow-2xl animate-in zoom-in-95 duration-200"
+                alt="Zoomed surveillance capture"
+                src={activeProofUrl}
+              />
+            )}
             <p className="text-white/60 text-xs font-semibold mt-4 text-center">
-              Surveillance Camera Feed Extract - Ref ID: {selectedIncident.id} - Location: {selectedIncident.location}
+              Evidence Feed Extract - Ref ID: {selectedIncident.id} - Location: {selectedIncident.location}
             </p>
           </div>
         </div>
