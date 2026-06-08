@@ -21,6 +21,7 @@ import {
   Clock
 } from "lucide-react";
 import { getStudentReports, getStudentReportDetail, StudentReport } from "@/actions/server/dashboard";
+import ProofLightboxModal from "@/components/modal/ProofLightboxModal";
 
 const getProofType = (url: string): "image" | "video" | "audio" | "unknown" => {
   const lowercaseUrl = url.toLowerCase();
@@ -764,43 +765,12 @@ export default function StudentDashboardHome() {
         </div>
       )}
 
-      {/* Lightbox / Zoom Modal */}
-      {activeProofUrl && selectedReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 animate-in fade-in duration-150">
-          <button
-            onClick={() => setActiveProofUrl(null)}
-            className="absolute top-6 right-6 p-2 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
-            title="Close Zoom"
-          >
-            <X className="w-8 h-8" />
-          </button>
-          <div className="max-w-5xl w-full max-h-[85vh] relative flex flex-col items-center justify-center">
-            {getProofType(activeProofUrl) === "video" ? (
-              <video
-                src={activeProofUrl}
-                controls
-                autoPlay
-                className="max-w-full max-h-[80vh] rounded-lg border border-white/10 shadow-2xl"
-              />
-            ) : getProofType(activeProofUrl) === "audio" ? (
-              <div className="bg-slate-900 p-8 rounded-lg border border-white/10 flex flex-col items-center gap-4 animate-in zoom-in-95 duration-200">
-                <Clock className="w-12 h-12 text-white animate-pulse" />
-                <audio src={activeProofUrl} controls autoPlay className="w-80" />
-                <span className="text-white text-xs">Audio Evidence Playback</span>
-              </div>
-            ) : (
-              <img
-                className="max-w-full max-h-[80vh] object-contain rounded-lg border border-white/10 shadow-2xl animate-in zoom-in-95 duration-200"
-                alt="Zoomed proof capture"
-                src={activeProofUrl}
-              />
-            )}
-            <p className="text-white/60 text-xs font-semibold mt-4 text-center">
-              Attachment Extract - Ref ID: #{selectedReport.postId} - University: {selectedReport.university}
-            </p>
-          </div>
-        </div>
-      )}
+      <ProofLightboxModal
+        isOpen={!!activeProofUrl}
+        proofUrl={activeProofUrl}
+        onClose={() => setActiveProofUrl(null)}
+        subText={selectedReport ? `Attachment Extract - Ref ID: #${selectedReport.postId} - University: ${selectedReport.university}` : undefined}
+      />
 
     </div>
   );

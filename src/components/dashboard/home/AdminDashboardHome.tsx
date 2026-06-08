@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   CheckCircle,
   Hourglass,
-  Scale,
   Search,
   Filter,
   ChevronRight,
@@ -24,13 +23,16 @@ import {
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { getAdminIncidents, getReporterBanStats, banReporter } from "@/actions/server/admin";
+import StatusBadge from "@/components/badge/StatusConfigBadge";
+import PriorityBadge from "@/components/badge/PriorityConfigBadge";
+import ProofLightboxModal from "@/components/modal/ProofLightboxModal";
 
 interface Incident {
   id: string;
   timestamp: string;
   category: string;
   priority: "High" | "Medium" | "Low";
-  status: "NEW" | "INVESTIGATING" | "DISPUTED" | "RESOLVED" | "REJECTED" | "PENDING" | "SUBMITTED";
+  status: "INVESTIGATING" | "RESOLVED" | "REJECTED" | "PENDING" | "SUBMITTED";
   location: string;
   evidenceCount: number;
   description: string;
@@ -91,7 +93,7 @@ export default function AdminDashboardHome() {
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeProofUrl, setActiveProofUrl] = useState<string | null>(null);
-  
+
   // DB status loader state
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -112,24 +114,25 @@ export default function AdminDashboardHome() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  const loadData = async () => {
-    try {
-      const res = await getAdminIncidents();
-      if (res.success && res.data) {
-        setIncidents(res.data as Incident[]);
-      } else {
-        setError(res.error || "Failed to load incidents data.");
-      }
-    } catch (err) {
-      console.error(err);
-      setError("An unexpected error occurred while fetching incidents.");
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   // Load incidents on mount
   useEffect(() => {
+    const loadData = async () => {
+      try {
+        const res = await getAdminIncidents();
+        if (res.success && res.data) {
+          setIncidents(res.data as Incident[]);
+        } else {
+          setError(res.error || "Failed to load incidents data.");
+        }
+      } catch (err) {
+        console.error(err);
+        setError("An unexpected error occurred while fetching incidents.");
+      } finally {
+        setLoading(false);
+      }
+    };
     loadData();
   }, []);
 
@@ -210,14 +213,6 @@ export default function AdminDashboardHome() {
     });
   };
 
-  // Impact Card metrics calculations
-  const totalPending = incidents.filter((i) => i.status === "PENDING").length;
-  const totalInvestigating = incidents.filter((i) => i.status === "INVESTIGATING").length;
-  const totalDisputed = incidents.filter((i) => i.status === "DISPUTED").length;
-  const totalResolved = incidents.filter((i) => i.status === "RESOLVED").length;
-  const responseScore = incidents.length
-    ? Math.round(((totalResolved + totalInvestigating) / incidents.length) * 100)
-    : 0;
 
   // Filtered incidents
   const filteredIncidents = incidents.filter((incident) => {
@@ -275,108 +270,23 @@ export default function AdminDashboardHome() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isModalOpen]);
 
-  // Actions
-  const handleOpenInvestigation = (incidentId: string) => {
-    Swal.fire({
-      title: "Initiate Investigation?",
-      text: `Do you want to open a formal investigation for case ${incidentId}?`,
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: "Yes, start investigation",
-      cancelButtonText: "Cancel",
-      confirmButtonColor: "var(--color-secondary, #0051d5)",
-    }).then((result) => {
-      if (result.isConfirmed) {
-        setIncidents((prev) =>
-          prev.map((i) =>
-            i.id === incidentId ? { ...i, status: "INVESTIGATING" } : i
-          )
-        );
-        if (selectedIncident && selectedIncident.id === incidentId) {
-          setSelectedIncident((prev) =>
-            prev ? { ...prev, status: "INVESTIGATING" } : null
-          );
-        }
-        Swal.fire({
-          title: "Investigation Commenced",
-          text: `Case ${incidentId} is now under active investigation.`,
-          icon: "success",
-          timer: 2000,
-          timerProgressBar: true,
-        });
-      }
-    });
-  };
 
-  const handleAssignTeam = (incidentId: string) => {
+  const handleRejectReport = (incidentId: string) => {
     Swal.fire({
-      title: "Assign Investigator",
-      input: "select",
-      inputOptions: {
-        "Dr. Syed Rafiq": "Dr. Syed Rafiq (Dean of Student Affairs)",
-        "Prof. Dr. M. A. Latif": "Prof. Dr. M. A. Latif (Hall Provost)",
-        "Mrs. Nasrin Akter": "Mrs. Nasrin Akter (Proctoral Body)",
-        "Major (Retd.) Rafiqul Islam": "Major (Retd.) Rafiqul Islam (Chief Security Officer)"
-      },
-      inputPlaceholder: "Select an investigator",
-      showCancelButton: true,
-      confirmButtonText: "Assign",
-      cancelButtonText: "Cancel",
-      confirmButtonColor: "var(--color-secondary, #0051d5)",
-      inputValidator: (value) => {
-        if (!value) {
-          return "You need to select an investigator!";
-        }
-        return null;
-      }
-    }).then((result) => {
-      if (result.isConfirmed && result.value) {
-        const investigatorName = result.value;
-        setIncidents((prev) =>
-          prev.map((i) =>
-            i.id === incidentId
-              ? { ...i, status: "INVESTIGATING", assignedInvestigator: investigatorName }
-              : i
-          )
-        );
-        if (selectedIncident && selectedIncident.id === incidentId) {
-          setSelectedIncident((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  status: "INVESTIGATING",
-                  assignedInvestigator: investigatorName,
-                }
-              : null
-          );
-        }
-        Swal.fire({
-          title: "Investigator Assigned",
-          text: `${investigatorName} has been assigned to Case ${incidentId}.`,
-          icon: "success",
-          timer: 2000,
-          timerProgressBar: true,
-        });
-      }
-    });
-  };
-
-  const handleFlagDispute = (incidentId: string) => {
-    Swal.fire({
-      title: "Flag Dispute",
+      title: "Reject Report",
       input: "textarea",
-      inputLabel: "Dispute Reason / Details",
-      inputPlaceholder: "Explain why this case is disputed...",
+      inputLabel: "Rejection Reason / Details",
+      inputPlaceholder: "Explain why this case is rejected...",
       inputAttributes: {
-        "aria-label": "Explain why this case is disputed"
+        "aria-label": "Explain why this case is rejected"
       },
       showCancelButton: true,
-      confirmButtonText: "Flag Dispute",
+      confirmButtonText: "Reject Report",
       cancelButtonText: "Cancel",
       confirmButtonColor: "var(--color-error, #ba1a1a)",
       inputValidator: (value) => {
         if (!value) {
-          return "Please provide a reason for the dispute!";
+          return "Please provide a reason for rejection!";
         }
         return null;
       }
@@ -386,19 +296,19 @@ export default function AdminDashboardHome() {
         setIncidents((prev) =>
           prev.map((i) =>
             i.id === incidentId
-              ? { ...i, status: "DISPUTED", disputeReason: reason }
+              ? { ...i, status: "REJECTED", rejectionReason: reason }
               : i
           )
         );
         if (selectedIncident && selectedIncident.id === incidentId) {
           setSelectedIncident((prev) =>
-            prev ? { ...prev, status: "DISPUTED", disputeReason: reason } : null
+            prev ? { ...prev, status: "REJECTED", rejectionReason: reason } : null
           );
         }
         Swal.fire({
-          title: "Case Disputed",
-          text: `Case ${incidentId} has been marked as disputed.`,
-          icon: "warning",
+          title: "Report Rejected",
+          text: `Case ${incidentId} has been rejected.`,
+          icon: "error",
           timer: 2000,
           timerProgressBar: true,
         });
@@ -421,8 +331,8 @@ export default function AdminDashboardHome() {
         <AlertTriangle className="w-12 h-12 text-error mx-auto" />
         <h3 className="text-headline-md font-bold text-error">Failed to Load Dashboard</h3>
         <p className="text-body-md text-on-surface-variant leading-relaxed">{error}</p>
-        <button 
-          onClick={() => window.location.reload()} 
+        <button
+          onClick={() => window.location.reload()}
           className="bg-primary text-on-primary px-5 py-2 rounded text-label-md font-bold hover:opacity-90 transition-opacity cursor-pointer"
         >
           Try Again
@@ -434,30 +344,30 @@ export default function AdminDashboardHome() {
   return (
     <div className="space-y-stack-lg animate-in fade-in duration-300">
       {/* Welcome Header */}
-      <header className="mb-stack-lg">
-        <h1 className="text-display text-primary mb-2">Faculty & Authorities Command Center</h1>
+      <div className="mb-stack-lg">
+        <h1 className="text-display text-primary mb-2">Admin Command Center</h1>
         <p className="text-body-md text-on-surface-variant">
           System oversight, real-time incident tracking, and institutional enforcement pipelines.
         </p>
-      </header>
+      </div>
 
-      {/* 1. Top Metric Cards (Bento Style) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter mb-stack-lg">
+      {/* 1. Top Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-gutter mb-stack-lg">
         {/* Pending Incidents */}
-        <div 
+        <div
           onClick={() => { setStatusFilter("PENDING"); setCurrentPage(1); }}
-          className={`bg-white border-l-[6px] border-l-error border border-outline-variant p-5 rounded-lg shadow-sm hover:border-error transition-all group cursor-pointer hover:-translate-y-0.5 duration-200 ${statusFilter === "PENDING" ? "ring-2 ring-error/50 bg-red-50/10" : ""}`}
+          className={`bg-white border-l-[6px] border-l-error border border-outline-variant p-5 rounded-lg shadow-sm hover:border-error transition-all group cursor-pointer hover:-translate-y-0.5 duration-200 ${statusFilter === "PENDING" ? "ring-5 ring-error/50 bg-red-50/10" : ""}`}
         >
           <div className="flex justify-between items-start mb-2">
             <ShieldAlert className="w-5 h-5 text-error group-hover:scale-110 transition-transform" />
             <span className="text-label-sm font-bold text-error bg-red-100/50 px-2 py-0.5 rounded">PENDING</span>
           </div>
-          <p className="text-display font-display text-primary mt-2">{totalPending}</p>
+          <p className="text-display font-display text-primary mt-2">0</p>
           <p className="text-label-md font-bold text-outline uppercase tracking-wider mt-1">Pending Incidents</p>
         </div>
 
         {/* Active Investigations */}
-        <div 
+        <div
           onClick={() => { setStatusFilter("INVESTIGATING"); setCurrentPage(1); }}
           className={`bg-white border-l-[6px] border-l-amber-500 border border-outline-variant p-5 rounded-lg shadow-sm hover:border-amber-500 transition-all group cursor-pointer hover:-translate-y-0.5 duration-200 ${statusFilter === "INVESTIGATING" ? "ring-2 ring-amber-500/50 bg-amber-50/10" : ""}`}
         >
@@ -465,12 +375,12 @@ export default function AdminDashboardHome() {
             <Hourglass className="w-5 h-5 text-amber-600 group-hover:scale-110 transition-transform" />
             <span className="text-label-sm font-bold text-amber-600 bg-amber-100/50 px-2 py-0.5 rounded">IN PROGRESS</span>
           </div>
-          <p className="text-display font-display text-primary mt-2">{totalInvestigating}</p>
+          <p className="text-display font-display text-primary mt-2">0</p>
           <p className="text-label-md font-bold text-outline uppercase tracking-wider mt-1">Active Investigations</p>
         </div>
 
         {/* Disputed Claims */}
-        <div 
+        <div
           onClick={() => { setStatusFilter("DISPUTED"); setCurrentPage(1); }}
           className={`bg-white border-l-[6px] border-l-rose-700 border border-outline-variant p-5 rounded-lg shadow-sm hover:border-rose-700 transition-all group cursor-pointer hover:-translate-y-0.5 duration-200 ${statusFilter === "DISPUTED" ? "ring-2 ring-rose-700/50 bg-rose-50/10" : ""}`}
         >
@@ -478,21 +388,8 @@ export default function AdminDashboardHome() {
             <AlertTriangle className="w-5 h-5 text-rose-700 group-hover:scale-110 transition-transform" />
             <span className="text-label-sm font-bold text-rose-700 bg-red-100/50 px-2 py-0.5 rounded font-black">DISPUTED</span>
           </div>
-          <p className="text-display font-display text-primary mt-2">{totalDisputed.toString().padStart(2, "0")}</p>
+          <p className="text-display font-display text-primary mt-2">0</p>
           <p className="text-label-md font-bold text-outline uppercase tracking-wider mt-1">Disputed Claims</p>
-        </div>
-
-        {/* Response Score */}
-        <div 
-          onClick={() => { setStatusFilter("All"); setPriorityFilter("All"); setSearchQuery(""); setCurrentPage(1); }}
-          className="bg-white border-l-[6px] border-l-green-600 border border-outline-variant p-5 rounded-lg shadow-sm hover:border-green-600 transition-all group cursor-pointer hover:-translate-y-0.5 duration-200"
-        >
-          <div className="flex justify-between items-start mb-2">
-            <CheckCircle className="w-5 h-5 text-green-600 group-hover:scale-110 transition-transform" />
-            <span className="text-label-sm font-bold text-green-600 bg-green-100/50 px-2 py-0.5 rounded">OPTIMAL</span>
-          </div>
-          <p className="text-display font-display text-primary mt-2">{responseScore}%</p>
-          <p className="text-label-md font-bold text-outline uppercase tracking-wider mt-1">Response Score</p>
         </div>
       </div>
 
@@ -524,11 +421,10 @@ export default function AdminDashboardHome() {
             <div className="relative">
               <button
                 onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                className={`flex items-center gap-1.5 px-3 py-2 border rounded-md text-label-md font-bold transition-all hover:bg-slate-50 cursor-pointer ${
-                  priorityFilter !== "All" || statusFilter !== "All"
-                    ? "border-secondary text-secondary bg-secondary-fixed/10"
-                    : "border-outline text-on-surface"
-                }`}
+                className={`flex items-center gap-1.5 px-3 py-2 border rounded-md text-label-md font-bold transition-all hover:bg-slate-50 cursor-pointer ${priorityFilter !== "All" || statusFilter !== "All"
+                  ? "border-secondary text-secondary bg-secondary-fixed/10"
+                  : "border-outline text-on-surface"
+                  }`}
               >
                 <Filter className="w-4 h-4" />
                 <span>Filter</span>
@@ -547,11 +443,10 @@ export default function AdminDashboardHome() {
                           <button
                             key={p}
                             onClick={() => { setPriorityFilter(p); setCurrentPage(1); }}
-                            className={`px-3 py-1 text-xs rounded-full font-semibold border cursor-pointer transition-all ${
-                              priorityFilter === p
-                                ? "bg-primary text-white border-primary"
-                                : "bg-slate-50 text-on-surface-variant border-outline-variant hover:bg-slate-100"
-                            }`}
+                            className={`px-3 py-1 text-xs rounded-full font-semibold border cursor-pointer transition-all ${priorityFilter === p
+                              ? "bg-primary text-white border-primary"
+                              : "bg-slate-50 text-on-surface-variant border-outline-variant hover:bg-slate-100"
+                              }`}
                           >
                             {p}
                           </button>
@@ -562,21 +457,22 @@ export default function AdminDashboardHome() {
                     <div className="border-t border-slate-100 pt-3">
                       <h4 className="text-label-sm font-bold text-on-surface-variant uppercase tracking-wider mb-2">Status</h4>
                       <div className="flex flex-wrap gap-2">
-                        {["All", "PENDING", "INVESTIGATING", "DISPUTED", "RESOLVED", "REJECTED"].map((s) => (
+                        {["All", "PENDING", "INVESTIGATING", "DISPUTED", "RESOLVED"].map((s) => (
                           <button
                             key={s}
                             onClick={() => { setStatusFilter(s); setCurrentPage(1); }}
-                            className={`px-2.5 py-1 text-xs rounded-full font-semibold border cursor-pointer transition-all ${
-                              statusFilter === s
-                                ? "bg-secondary text-white border-secondary"
-                                : "bg-slate-50 text-on-surface-variant border-outline-variant hover:bg-slate-100"
-                            }`}
+                            className={`px-2.5 py-1 text-xs rounded-full font-semibold border cursor-pointer transition-all ${statusFilter === s
+                              ? "bg-secondary text-white border-secondary"
+                              : "bg-slate-50 text-on-surface-variant border-outline-variant hover:bg-slate-100"
+                              }`}
                           >
                             {s}
                           </button>
                         ))}
                       </div>
                     </div>
+
+                    {/* Reset button for filters */}
 
                     <div className="border-t border-slate-100 pt-2 flex justify-between">
                       <button
@@ -590,6 +486,9 @@ export default function AdminDashboardHome() {
                       >
                         Reset All
                       </button>
+
+                      {/* Apply button for filters */}
+
                       <button
                         onClick={() => setShowFilterDropdown(false)}
                         className="text-xs text-secondary font-bold hover:underline cursor-pointer"
@@ -637,54 +536,13 @@ export default function AdminDashboardHome() {
                         {incident.timestamp}
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-body-md text-on-surface font-semibold">{incident.category}</span>
+                        <span className="text-body-md text-on-surface font-semibold">{incident.category.toUpperCase()}</span>
                       </td>
                       <td className="px-6 py-4">
-                        <span
-                          className={`text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-wider inline-block ${
-                            isHigh
-                              ? "bg-error-container/50 text-error border border-error/20"
-                              : isMedium
-                              ? "bg-amber-100 text-amber-800 border border-amber-200/50"
-                              : "bg-slate-100 text-on-surface-variant border border-slate-200"
-                          }`}
-                        >
-                          {incident.priority}
-                        </span>
+                        <PriorityBadge priority={incident.priority} />
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          {(incident.status === "PENDING" || incident.status === "NEW" || incident.status === "SUBMITTED") && (
-                            <>
-                              <Clock className="w-4 h-4 text-amber-600 animate-pulse" />
-                              <span className="text-label-sm text-amber-600 font-bold uppercase tracking-wider">PENDING</span>
-                            </>
-                          )}
-                          {incident.status === "INVESTIGATING" && (
-                            <>
-                              <Hourglass className="w-4 h-4 text-amber-600" />
-                              <span className="text-label-sm text-amber-600 font-bold uppercase tracking-wider">INVESTIGATING</span>
-                            </>
-                          )}
-                          {incident.status === "DISPUTED" && (
-                            <>
-                              <AlertTriangle className="w-4 h-4 text-rose-700" />
-                              <span className="text-label-sm text-rose-700 font-bold uppercase tracking-wider">DISPUTED</span>
-                            </>
-                          )}
-                          {incident.status === "RESOLVED" && (
-                            <>
-                              <CheckCircle className="w-4 h-4 text-green-700" />
-                              <span className="text-label-sm text-green-700 font-bold uppercase tracking-wider">RESOLVED</span>
-                            </>
-                          )}
-                          {incident.status === "REJECTED" && (
-                            <>
-                              <AlertCircle className="w-4 h-4 text-error" />
-                              <span className="text-label-sm text-error font-bold uppercase tracking-wider">REJECTED</span>
-                            </>
-                          )}
-                        </div>
+                        <StatusBadge status={incident.status} />
                       </td>
                       <td className="px-6 py-4 text-right">
                         <ChevronRight className="w-5 h-5 text-outline opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
@@ -736,11 +594,10 @@ export default function AdminDashboardHome() {
                 <button
                   key={i}
                   onClick={() => setCurrentPage(i + 1)}
-                  className={`px-3 py-1.5 border rounded cursor-pointer transition-colors ${
-                    currentPage === i + 1
-                      ? "bg-primary text-white border-primary"
-                      : "bg-white hover:bg-slate-100 border-outline text-on-surface"
-                  }`}
+                  className={`px-3 py-1.5 border rounded cursor-pointer transition-colors ${currentPage === i + 1
+                    ? "bg-primary text-white border-primary"
+                    : "bg-white hover:bg-slate-100 border-outline text-on-surface"
+                    }`}
                 >
                   {i + 1}
                 </button>
@@ -764,54 +621,15 @@ export default function AdminDashboardHome() {
           <div className="absolute inset-0" onClick={handleCloseModal}></div>
 
           <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-            
+
             {/* Modal Header */}
             <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-slate-50/50">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="text-label-sm font-bold text-outline uppercase tracking-wider">Reference ID</span>
                 <span className="text-headline-md font-extrabold text-primary">{selectedIncident.id}</span>
-                <span
-                  className={`text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-wider ${
-                    selectedIncident.priority === "High"
-                      ? "bg-error-container/50 text-error border border-error/20"
-                      : selectedIncident.priority === "Medium"
-                      ? "bg-amber-100 text-amber-800 border border-amber-200/50"
-                      : "bg-slate-100 text-on-surface-variant border border-slate-200"
-                  }`}
-                >
-                  {selectedIncident.priority} PRIORITY
-                </span>
-                
-                {(selectedIncident.status === "PENDING" || selectedIncident.status === "NEW" || selectedIncident.status === "SUBMITTED") && (
-                  <span className="bg-amber-600 text-white text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-wider flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5" />
-                    PENDING
-                  </span>
-                )}
-                {selectedIncident.status === "INVESTIGATING" && (
-                  <span className="bg-amber-600 text-white text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-wider flex items-center gap-1">
-                    <Hourglass className="w-3.5 h-3.5" />
-                    INVESTIGATING
-                  </span>
-                )}
-                {selectedIncident.status === "DISPUTED" && (
-                  <span className="bg-rose-700 text-white text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-wider flex items-center gap-1">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    DISPUTED
-                  </span>
-                )}
-                {selectedIncident.status === "RESOLVED" && (
-                  <span className="bg-green-700 text-white text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-wider flex items-center gap-1">
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    RESOLVED
-                  </span>
-                )}
-                {selectedIncident.status === "REJECTED" && (
-                  <span className="bg-error text-white text-[10px] font-bold px-2.5 py-1 rounded uppercase tracking-wider flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    REJECTED
-                  </span>
-                )}
+                <PriorityBadge priority={selectedIncident.priority} />
+
+                <StatusBadge status={selectedIncident.status} variant="filled" />
               </div>
               <button
                 onClick={handleCloseModal}
@@ -824,7 +642,7 @@ export default function AdminDashboardHome() {
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                
+
                 {/* Left Side: Metadata and Evidence Details */}
                 <div className="md:col-span-1 space-y-6">
                   {/* Location Info Card */}
@@ -858,8 +676,8 @@ export default function AdminDashboardHome() {
                         </p>
                         <ul className="text-xs text-on-surface-variant space-y-1 pl-1">
                           {selectedIncident.proofUrls.map((url, idx) => (
-                            <li 
-                              key={idx} 
+                            <li
+                              key={idx}
                               onClick={() => setActiveProofUrl(url)}
                               className="flex items-center gap-1.5 hover:text-primary hover:underline cursor-pointer"
                             >
@@ -888,14 +706,14 @@ export default function AdminDashboardHome() {
                   )}
 
                   {/* Dispute Reason Card */}
-                  {selectedIncident.status === "DISPUTED" && selectedIncident.disputeReason && (
+                  {selectedIncident.status === "REJECTED" && selectedIncident.rejectionReason && (
                     <div className="p-4 bg-red-50 border border-error/20 rounded-lg space-y-3">
                       <div className="flex items-center gap-2 text-error text-label-sm font-bold uppercase tracking-wider">
-                        <AlertTriangle className="w-4 h-4" />
-                        <span>Dispute Details</span>
+                        <AlertCircle className="w-4 h-4" />
+                        <span>Rejection Reason</span>
                       </div>
                       <p className="text-body-md text-on-error-container italic leading-relaxed">
-                        &quot;{selectedIncident.disputeReason}&quot;
+                        &quot;{selectedIncident.rejectionReason}&quot;
                       </p>
                     </div>
                   )}
@@ -977,9 +795,8 @@ export default function AdminDashboardHome() {
                       </div>
                       <div>
                         <span className="text-xs font-bold text-outline uppercase tracking-wider block mb-1">Appeal Decision Status</span>
-                        <div className={`inline-block px-3 py-1 rounded text-label-sm font-bold uppercase tracking-wider ${
-                          selectedIncident.adminVerification.status === "APPROVED" ? "bg-green-100 text-green-800" : selectedIncident.adminVerification.status === "PENDING" ? "bg-amber-100 text-amber-800 animate-pulse" : "bg-red-100 text-red-800"
-                        }`}>
+                        <div className={`inline-block px-3 py-1 rounded text-label-sm font-bold uppercase tracking-wider ${selectedIncident.adminVerification.status === "APPROVED" ? "bg-green-100 text-green-800" : selectedIncident.adminVerification.status === "PENDING" ? "bg-amber-100 text-amber-800 animate-pulse" : "bg-red-100 text-red-800"
+                          }`}>
                           Appeal {selectedIncident.adminVerification.status}
                         </div>
                       </div>
@@ -1056,28 +873,16 @@ export default function AdminDashboardHome() {
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                 <span>Case monitored under Judicial Integrity commission.</span>
               </div>
-              
-              <div className="flex flex-wrap justify-end gap-3 w-full sm:w-auto">
+
+              <div className="flex  justify-end w-full sm:w-auto">
                 <button
-                  onClick={() => handleFlagDispute(selectedIncident.id)}
+                  disabled={selectedIncident.status === "REJECTED"}
+                  onClick={() => handleRejectReport(selectedIncident.id)}
                   className="px-4 py-2.5 border border-error text-error font-bold text-label-md rounded hover:bg-red-50 active:scale-95 transition-all cursor-pointer shadow-sm w-full sm:w-auto"
                 >
-                  Flag Dispute
+                  {selectedIncident.status !== "REJECTED" ? "Reject Report" : "Rejected"}
                 </button>
-                <button
-                  onClick={() => handleAssignTeam(selectedIncident.id)}
-                  className="px-4 py-2.5 border border-outline text-on-surface font-bold text-label-md rounded hover:bg-slate-100 active:scale-95 transition-all cursor-pointer shadow-sm w-full sm:w-auto"
-                >
-                  Assign Investigator
-                </button>
-                {selectedIncident.status !== "RESOLVED" && (
-                  <button
-                    onClick={() => handleOpenInvestigation(selectedIncident.id)}
-                    className="px-5 py-2.5 bg-primary text-on-primary font-bold text-label-md rounded hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-sm w-full sm:w-auto"
-                  >
-                    {(selectedIncident.status === "PENDING" || selectedIncident.status === "NEW" || selectedIncident.status === "SUBMITTED") ? "Open Formal Investigation" : "Progress Investigation"}
-                  </button>
-                )}
+
               </div>
             </div>
 
@@ -1085,43 +890,12 @@ export default function AdminDashboardHome() {
         </div>
       )}
 
-      {/* Lightbox / Zoom Modal */}
-      {activeProofUrl && selectedIncident && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 animate-in fade-in duration-150">
-          <button
-            onClick={() => setActiveProofUrl(null)}
-            className="absolute top-6 right-6 p-2 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
-            title="Close Zoom"
-          >
-            <X className="w-8 h-8" />
-          </button>
-          <div className="max-w-5xl w-full max-h-[85vh] relative flex flex-col items-center justify-center">
-            {getProofType(activeProofUrl) === "video" ? (
-              <video
-                src={activeProofUrl}
-                controls
-                autoPlay
-                className="max-w-full max-h-[80vh] rounded-lg border border-white/10 shadow-2xl"
-              />
-            ) : getProofType(activeProofUrl) === "audio" ? (
-              <div className="bg-slate-900 p-8 rounded-lg border border-white/10 flex flex-col items-center gap-4 animate-in zoom-in-95 duration-200">
-                <Clock className="w-12 h-12 text-white animate-pulse" />
-                <audio src={activeProofUrl} controls autoPlay className="w-80" />
-                <span className="text-white text-xs">Audio Evidence Playback</span>
-              </div>
-            ) : (
-              <img
-                className="max-w-full max-h-[80vh] object-contain rounded-lg border border-white/10 shadow-2xl animate-in zoom-in-95 duration-200"
-                alt="Zoomed surveillance capture"
-                src={activeProofUrl}
-              />
-            )}
-            <p className="text-white/60 text-xs font-semibold mt-4 text-center">
-              Evidence Feed Extract - Ref ID: {selectedIncident.id} - Location: {selectedIncident.location}
-            </p>
-          </div>
-        </div>
-      )}
+      <ProofLightboxModal
+        isOpen={!!activeProofUrl}
+        proofUrl={activeProofUrl}
+        onClose={() => setActiveProofUrl(null)}
+        subText={selectedIncident ? `Evidence Feed Extract - Ref ID: ${selectedIncident.id} - Location: ${selectedIncident.location}` : undefined}
+      />
     </div>
   );
 }
