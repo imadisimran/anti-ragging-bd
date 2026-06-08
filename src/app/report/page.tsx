@@ -5,7 +5,8 @@ import { CloudUpload, X, ShieldAlert, AlertTriangle, UserCheck, ArrowRight } fro
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
-import { aiVerification, getLocation, postReport } from "@/actions/server/reportForm";
+import { generateSignature, getLocation, postReport } from "@/actions/server/reportForm";
+import { CloudinaryUpload } from "@/types/reportForm.type";
 
 interface ReportFormInputs {
   university: string;
@@ -96,8 +97,76 @@ export default function ReportPage() {
   const handlePostReport = async (data: ReportFormInputs) => {
     try {
       Swal.fire({
-        title: "Submitting...",
-        text: "Encrypting narrative and uploading proof files, please wait.",
+        title: "Uploading files...",
+        text: "Please wait while your proof files are being uploaded to Cloudinary.",
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      const uploadedUrls: CloudinaryUpload[] = [];
+
+      if (data.proofFiles && data.proofFiles.length > 0) {
+        const filesArray = Array.from(data.proofFiles);
+        const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+        const apiKey = process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY;
+
+        if (!cloudName || !apiKey) {
+          throw new Error("Cloudinary client-side environment variables are not configured.");
+        }
+
+        for (let i = 0; i < filesArray.length; i++) {
+          const file = filesArray[i];
+          Swal.update({
+            text: `Uploading file ${i + 1} of ${filesArray.length}: ${file.name}`,
+            allowOutsideClick: false,
+            showConfirmButton:false
+          });
+
+          const timestamp = Math.round(new Date().getTime() / 1000);
+          const folder = "anti-ragging-reports";
+
+          // Generate server-side signature
+          const signature = await generateSignature({
+            timestamp,
+            folder
+          });
+
+          // Upload directly to Cloudinary
+          const uploadFormData = new FormData();
+          uploadFormData.append("file", file);
+          uploadFormData.append("api_key", apiKey);
+          uploadFormData.append("timestamp", timestamp.toString());
+          uploadFormData.append("signature", signature);
+          uploadFormData.append("folder", folder);
+
+          // Use 'auto' endpoint for automatic detection of image, video, audio
+          const response = await fetch(
+            `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
+            {
+              method: "POST",
+              body: uploadFormData
+            }
+          );
+
+          if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Failed to upload ${file.name} to Cloudinary: ${errText}`);
+          }
+
+          const uploadResult = await response.json();
+          uploadedUrls.push({
+            secureUrl: uploadResult.secure_url,
+            resource_type: uploadResult.resource_type,
+            publicId: uploadResult.public_id
+          });
+        }
+      }
+
+      Swal.fire({
+        title: "Submitting report...",
+        text: "Encrypting and submitting your report, please wait.",
         allowOutsideClick: false,
         didOpen: () => {
           Swal.showLoading();
@@ -112,10 +181,8 @@ export default function ReportPage() {
       formData.append("specificLocation", data.specificLocation);
       formData.append("narrative", data.narrative);
 
-      if (data.proofFiles) {
-        Array.from(data.proofFiles).forEach((file) => {
-          formData.append("proofFiles", file);
-        });
+      if (uploadedUrls.length > 0) {
+        formData.append("proofUrls", JSON.stringify(uploadedUrls));
       }
 
       const result = await postReport(formData);
@@ -141,7 +208,7 @@ export default function ReportPage() {
       console.error(err);
       Swal.fire({
         title: "ERROR",
-        text: "An unexpected error occurred.",
+        text: err instanceof Error ? err.message : "An unexpected error occurred.",
         icon: "error",
         confirmButtonColor: "var(--color-primary, #000000)"
       });

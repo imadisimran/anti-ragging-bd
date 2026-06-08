@@ -21,23 +21,19 @@ export const getLocation = async (universityName: string, category: string): Pro
     return newData
 }
 
-const uploadToCloudinary = async (file: File): Promise<CloudinaryUpload> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+export const generateSignature = async (paramsToSign: Record<string, any>) => {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+        throw new Error("Unauthorized");
+    }
 
-    return new Promise((resolve, reject) => {
-        cloudinary.uploader.upload_stream(
-            { resource_type: "auto", folder: "anti-ragging-reports" },
-            (error, result) => {
-                if (error) {
-                    reject(error);
-                } else {
-                    console.log(result)
-                    resolve({ secureUrl: result?.secure_url || "", resource_type: result?.resource_type || "", publicId: result?.public_id || "" });
-                }
-            }
-        ).end(buffer);
-    });
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+    if (!apiSecret) {
+        throw new Error("Cloudinary API secret not configured on server");
+    }
+
+    const signature = cloudinary.utils.api_sign_request(paramsToSign, apiSecret);
+    return signature;
 };
 
 export const aiVerification = async (narrative: string) => {
@@ -106,32 +102,24 @@ export const postReport = async (reportData: FormData) => {
             };
         }
 
-        const files = reportData.getAll("proofFiles") as File[];
-        const validFiles = files.filter((file) => file.size > 0 && file.name !== "undefined");
+        const proofUrlsStr = reportData.get("proofUrls") as string;
+        let proofUrls: CloudinaryUpload[] | null = null;
+        if (proofUrlsStr) {
+            try {
+                proofUrls = JSON.parse(proofUrlsStr) as CloudinaryUpload[];
+            } catch (err) {
+                console.error("Error parsing proofUrls:", err);
+            }
+        }
 
-        if (validFiles.length > 5) {
+        if (proofUrls && proofUrls.length > 5) {
             return {
                 success: false,
                 message: "You can upload a maximum of 5 files."
             };
         }
 
-        const totalSize = validFiles.reduce((sum, file) => sum + file.size, 0);
-        if (totalSize > 500 * 1024 * 1024) {
-            return {
-                success: false,
-                message: "Total uploaded file size cannot exceed 500 MB."
-            };
-        }
-
-        const aiResult = await aiVerification(narrative)
-
-        // console.log(aiResult)
-
-        const uploadPromises = validFiles.map((file) => uploadToCloudinary(file));
-
-        const uploadedUrls = await Promise.all(uploadPromises);
-        const proofUrls = uploadedUrls.length > 0 ? uploadedUrls : null;
+        const aiResult = await aiVerification(narrative);
 
         const emailSearchHash = generateBlindIndex(session?.user?.email || "")
 
