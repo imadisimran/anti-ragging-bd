@@ -57,7 +57,7 @@ export async function getStudentReports(): Promise<StudentDashboardResponse> {
       sanitizedDescription: item.sanitizedDescription || "",
       detectedSeverity: item.detectedSeverity || "LOW",
       status: item.status || "SUBMITTED",
-      proofUrls: item.proofUrls || [],
+      proofUrls: item.proofUrls ? item.proofUrls.map((p: any) => typeof p === "string" ? p : p.secureUrl || p) : [],
       dateTime: item.dateTime || new Date(),
       isRaggingIncident: item.isRaggingIncident ?? true
     }))
@@ -102,7 +102,7 @@ export async function getStudentReportDetail(postId: string): Promise<StudentRep
       sanitizedDescription: rawReport.sanitizedDescription || "",
       detectedSeverity: rawReport.detectedSeverity || "LOW",
       status: rawReport.status || "SUBMITTED",
-      proofUrls: rawReport.proofUrls || [],
+      proofUrls: rawReport.proofUrls ? rawReport.proofUrls.map((p: any) => typeof p === "string" ? p : p.secureUrl || p) : [],
       dateTime: rawReport.dateTime || new Date(),
       isRaggingIncident: rawReport.isRaggingIncident ?? true
     }

@@ -21,7 +21,7 @@ export interface ReportPayload {
     locationCategory: string;
     specificLocation: string;
     narrative: string;
-    proofUrls: string[];
+    proofUrls: CloudinaryUpload[] | null;
     createdAt: Date;
     isRaggingIncident?: boolean;
     sanitizedTitle?: string;
@@ -58,4 +58,10 @@ export interface ReportPayload {
     upVotesCount: number;
     upVotesBy: string[]
 
+}
+
+export interface CloudinaryUpload {
+    secureUrl: string;
+    resource_type: string;
+    publicId: string
 }

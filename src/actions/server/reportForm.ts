@@ -1,7 +1,7 @@
 "use server"
 
 import { dbConnect, collections } from "@/lib/dbConnect"
-import { AiVerificationResult, GetLocation, ReportPayload } from "@/types/reportForm.type"
+import { AiVerificationResult, CloudinaryUpload, GetLocation, ReportPayload } from "@/types/reportForm.type"
 import { v2 as cloudinary } from 'cloudinary'
 import { GoogleGenAI } from "@google/genai";
 import { nanoid } from "nanoid";
@@ -21,7 +21,7 @@ export const getLocation = async (universityName: string, category: string): Pro
     return newData
 }
 
-const uploadToCloudinary = async (file: File): Promise<string> => {
+const uploadToCloudinary = async (file: File): Promise<CloudinaryUpload> => {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
@@ -33,7 +33,7 @@ const uploadToCloudinary = async (file: File): Promise<string> => {
                     reject(error);
                 } else {
                     console.log(result)
-                    resolve(result?.secure_url || "");
+                    resolve({ secureUrl: result?.secure_url || "", resource_type: result?.resource_type || "", publicId: result?.public_id || "" });
                 }
             }
         ).end(buffer);
@@ -99,17 +99,39 @@ export const postReport = async (reportData: FormData) => {
         const specificLocation = reportData.get("specificLocation") as string;
         const narrative = reportData.get("narrative") as string;
 
+        if (narrative.length > 3500) {
+            return {
+                success: false,
+                message: "Narrative cannot exceed 3500 characters."
+            };
+        }
+
+        const files = reportData.getAll("proofFiles") as File[];
+        const validFiles = files.filter((file) => file.size > 0 && file.name !== "undefined");
+
+        if (validFiles.length > 5) {
+            return {
+                success: false,
+                message: "You can upload a maximum of 5 files."
+            };
+        }
+
+        const totalSize = validFiles.reduce((sum, file) => sum + file.size, 0);
+        if (totalSize > 500 * 1024 * 1024) {
+            return {
+                success: false,
+                message: "Total uploaded file size cannot exceed 500 MB."
+            };
+        }
+
         const aiResult = await aiVerification(narrative)
 
         // console.log(aiResult)
 
-        const files = reportData.getAll("proofFiles") as File[];
+        const uploadPromises = validFiles.map((file) => uploadToCloudinary(file));
 
-        const uploadPromises = files
-            .filter((file) => file.size > 0 && file.name !== "undefined")
-            .map((file) => uploadToCloudinary(file));
-
-        const proofUrls = await Promise.all(uploadPromises);
+        const uploadedUrls = await Promise.all(uploadPromises);
+        const proofUrls = uploadedUrls.length > 0 ? uploadedUrls : null;
 
         const emailSearchHash = generateBlindIndex(session?.user?.email || "")
 

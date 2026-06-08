@@ -61,7 +61,7 @@ export async function getMyDetailedReports(): Promise<MyReportsResponse> {
       sanitizedDescription: item.sanitizedDescription || "",
       detectedSeverity: item.detectedSeverity || "LOW",
       status: item.status || "SUBMITTED",
-      proofUrls: item.proofUrls || [],
+      proofUrls: item.proofUrls ? item.proofUrls.map((p: any) => typeof p === "string" ? p : p.secureUrl || p) : [],
       dateTime: item.dateTime || new Date(),
       isRaggingIncident: item.isRaggingIncident ?? true,
       narrative: item.narrative || "",

@@ -45,7 +45,7 @@ export const getDetailsReport = async (id: string): Promise<ReportDetail> => {
                 dateTime: rawReportData.dateTime,
                 harassmentType: rawReportData.harassmentType || "",
                 specificLocation: rawReportData.specificLocation || "",
-                proofUrls: rawReportData.proofUrls || [],
+                proofUrls: rawReportData.proofUrls ? rawReportData.proofUrls.map((p: any) => typeof p === "string" ? p : p.secureUrl || p) : [],
                 createdAt: rawReportData.createdAt,
                 detectedSeverity: rawReportData.detectedSeverity || "LOW",
                 status: rawReportData.status || "PENDING",

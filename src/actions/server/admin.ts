@@ -61,7 +61,7 @@ export async function getAppealsList(): Promise<AppealsResponse> {
       sanitizedDescription: item.sanitizedDescription || "",
       detectedSeverity: item.detectedSeverity || "LOW",
       status: item.status || "SUBMITTED",
-      proofUrls: item.proofUrls || [],
+      proofUrls: item.proofUrls ? item.proofUrls.map((p: any) => typeof p === "string" ? p : p.secureUrl || p) : [],
       dateTime: item.dateTime || new Date(),
       isRaggingIncident: item.isRaggingIncident ?? true,
       narrative: item.narrative || "",
@@ -270,8 +270,9 @@ export async function getAdminIncidents(): Promise<{ success: boolean; data?: Ad
       if (item.detectedSeverity === "HIGH") priority = "High";
       else if (item.detectedSeverity === "MEDIUM") priority = "Medium";
 
-      const verificationImage = item.proofUrls && item.proofUrls.length > 0
-        ? item.proofUrls[0]
+      const rawProofUrls = item.proofUrls ? item.proofUrls.map((p: any) => typeof p === "string" ? p : p.secureUrl || p) : [];
+      const verificationImage = rawProofUrls.length > 0
+        ? rawProofUrls[0]
         : "https://lh3.googleusercontent.com/aida-public/AB6AXuB9cdHpv3GOvl0c7q95A5k6m55Vz610w-hOG1EpEIzTCnDgOnj9Xk2pp6XRtfNooYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHYnQw0l3Hq59xYsfUTe4PA05zr-pt14q1M8Qra_vTvGZj1qKJBFLsPei6koRlJiBIWJYMBvgfijB_BW7obY5qbvrg3bX5koYd3rs8qjWyFdUCTFUFkOUETk";
 
       return {
@@ -281,7 +282,7 @@ export async function getAdminIncidents(): Promise<{ success: boolean; data?: Ad
         priority,
         status: item.status || "NEW",
         location: `${item.university || ""} • ${item.specificLocation || ""}`,
-        evidenceCount: item.proofUrls ? item.proofUrls.length : 0,
+        evidenceCount: rawProofUrls.length,
         description: item.narrative || "",
         verificationImage,
         assignedInvestigator: item.adminVerification?.adminId || undefined,
@@ -289,7 +290,7 @@ export async function getAdminIncidents(): Promise<{ success: boolean; data?: Ad
         isRaggingIncident: item.isRaggingIncident ?? true,
         rejectionReason: item.rejectionReason || null,
         adminVerification: item.adminVerification || null,
-        proofUrls: item.proofUrls || [],
+        proofUrls: rawProofUrls,
       };
     });
 

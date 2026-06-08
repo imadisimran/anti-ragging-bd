@@ -391,7 +391,14 @@ export default function ReportPage() {
             <label className="text-label-md font-bold text-on-surface">Detailed Account of Incident</label>
             <textarea
               rows={6}
-              {...register("narrative", { required: "Detailed account is required" })}
+              maxLength={3500}
+              {...register("narrative", {
+                required: "Detailed account is required",
+                maxLength: {
+                  value: 3500,
+                  message: "Narrative cannot exceed 3500 characters"
+                }
+              })}
               placeholder="Describe the event with as much detail as possible. Avoid mentioning your own name if you wish to remain fully anonymous."
               className={`w-full p-4 bg-white border rounded-md focus:ring-2 outline-none text-body-md resize-none transition-all text-on-surface ${errors.narrative
                 ? "border-error focus:ring-error/20 focus:border-error"
@@ -402,7 +409,7 @@ export default function ReportPage() {
               <p className="text-[11px] text-error font-medium mt-1">{errors.narrative.message}</p>
             )}
             <p className="text-[11px] text-on-surface-variant font-medium">
-              Character limit: 5000. All text is encrypted client-side before transmission.
+              Character limit: 3500
             </p>
           </div>
         </div>
@@ -424,7 +431,7 @@ export default function ReportPage() {
               <p className="mt-4 text-label-md font-bold text-on-surface">Drag and drop files here</p>
               <p className="text-body-md text-on-surface-variant">or click to browse from your device</p>
               <p className="mt-2 text-[11px] text-on-surface-variant font-medium">
-                Supports Images, Audio, and Video files
+                Supports Images, Audio, and Video files. Max 5 files, 500 MB total.
               </p>
               <input
                 type="file"
@@ -433,14 +440,26 @@ export default function ReportPage() {
                 {...register("proofFiles", {
                   validate: (fileList) => {
                     if (!fileList || fileList.length === 0) return true;
+                    
+                    if (fileList.length > 5) {
+                      return "You can upload a maximum of 5 files";
+                    }
+
                     const allowedTypes = ["image/", "video/", "audio/"];
+                    let totalSize = 0;
                     for (let i = 0; i < fileList.length; i++) {
                       const file = fileList[i];
                       const isValid = allowedTypes.some((type) => file.type.startsWith(type));
                       if (!isValid) {
                         return "Only image, video, and audio files are allowed";
                       }
+                      totalSize += file.size;
                     }
+
+                    if (totalSize > 500 * 1024 * 1024) {
+                      return "Total file size cannot exceed 500 MB";
+                    }
+
                     return true;
                   }
                 })}
