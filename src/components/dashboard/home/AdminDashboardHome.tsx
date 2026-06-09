@@ -12,10 +12,11 @@ import {
   ChevronDown,
   Loader2,
 } from "lucide-react";
-import { getAdminIncidents, getAdminIncidentDetails, BriefAdminIncident } from "@/actions/server/admin";
+import { getAdminIncidents, getAdminIncidentDetails, BriefAdminIncident, DetailAdminIncident } from "@/actions/server/admin";
 import StatusBadge from "@/components/badge/StatusConfigBadge";
 import PriorityBadge from "@/components/badge/PriorityConfigBadge";
-import AdminIncidentModal, { Incident } from "@/components/modal/AdminIncidentModal";
+import AdminIncidentModal from "@/components/modal/AdminIncidentModal";
+import { Incident } from "@/types/AdminDashboardTypes";
 
 
 export default function AdminDashboardHome() {
@@ -123,7 +124,28 @@ export default function AdminDashboardHome() {
     try {
       const res = await getAdminIncidentDetails(postId);
       if (res.success && res.data) {
-        setSelectedIncident(res.data as Incident);
+        const item = res.data;
+        let priority: "High" | "Medium" | "Low" = "Low";
+        if (item.detectedSeverity === "HIGH") priority = "High";
+        else if (item.detectedSeverity === "MEDIUM") priority = "Medium";        
+        const formattedIncident: Incident = {
+          id: item.postId || "",
+          timestamp: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "",
+          category: item.harassmentType || "General Incident",
+          priority,
+          status: (item.status || "PENDING") as any,
+          location: `${item.university || ""} • ${item.specificLocation || ""}`,
+          evidenceCount: (item.proofUrls || []).length,
+          description: item.narrative || "",
+          assignedInvestigator: item.adminVerification?.adminId || undefined,
+          disputeReason: item.adminVerification?.adminNote || undefined,
+          isRaggingIncident: item.isRaggingIncident ?? true,
+          rejectionReason: item.rejectionReason || null,
+          adminVerification: item.adminVerification || null,
+          proofUrls: item.proofUrls || [],
+        };
+
+        setSelectedIncident(formattedIncident);
         setIsModalOpen(true);
       } else {
         alert(res.error || "Failed to load incident details.");

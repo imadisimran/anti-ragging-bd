@@ -4,6 +4,7 @@ import { dbConnect, collections } from "@/lib/dbConnect"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/authOptions"
 import { generateBlindIndex } from "@/lib/encryption"
+import { ProofUrlType } from "@/types/AdminDashboardTypes"
 
 export interface StudentReport {
   postId: string;
@@ -15,7 +16,7 @@ export interface StudentReport {
   sanitizedDescription: string;
   detectedSeverity: string;
   status: string;
-  proofUrls: string[];
+  proofUrls: ProofUrlType[];
   dateTime: Date;
   isRaggingIncident: boolean;
 }
@@ -57,7 +58,7 @@ export async function getStudentReports(): Promise<StudentDashboardResponse> {
       sanitizedDescription: item.sanitizedDescription || "",
       detectedSeverity: item.detectedSeverity || "LOW",
       status: item.status || "SUBMITTED",
-      proofUrls: item.proofUrls ? item.proofUrls.map((p: any) => typeof p === "string" ? p : p.secureUrl || p) : [],
+      proofUrls: item.proofUrls,
       dateTime: item.dateTime || new Date(),
       isRaggingIncident: item.isRaggingIncident ?? true
     }))

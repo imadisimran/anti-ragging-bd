@@ -124,11 +124,11 @@ export async function resolveAppeal(
 
     const result = await dbConnect(collections.REPORTS).updateOne(
       { postId },
-      { 
-        $set: { 
-          isRaggingIncident: isRagging, 
-          status: statusVal, 
-          adminVerification: updatedVerification 
+      {
+        $set: {
+          isRaggingIncident: isRagging,
+          status: statusVal,
+          adminVerification: updatedVerification
         },
         $push: {
           updatedAt: newUpdateLog
@@ -226,9 +226,9 @@ export async function banReporter(
     )
 
     if (result.modifiedCount > 0) {
-      return { 
-        success: true, 
-        message: `Reporter suspended successfully. Duration: ${duration === "permanent" ? "Permanent" : `${duration} Months`}.` 
+      return {
+        success: true,
+        message: `Reporter suspended successfully. Duration: ${duration === "permanent" ? "Permanent" : `${duration} Months`}.`
       }
     }
     return { success: false, error: "Failed to apply suspension on the reporter account." }
@@ -254,22 +254,19 @@ export interface GetAdminIncidentsOptions {
   statusFilter?: string;
 }
 
-export interface AdminIncident {
-  id: string;
-  timestamp: string;
-  category: string;
-  priority: "High" | "Medium" | "Low";
-  status: "NEW" | "INVESTIGATING" | "DISPUTED" | "RESOLVED" | "REJECTED" | "PENDING" | "SUBMITTED";
-  location: string;
-  evidenceCount: number;
-  description: string;
-  verificationImage: string;
-  assignedInvestigator?: string;
-  disputeReason?: string;
-  isRaggingIncident: boolean;
-  rejectionReason: string | null;
-  adminVerification: any;
-  proofUrls: string[];
+export interface DetailAdminIncident {
+  postId: string;
+  createdAt: Date;
+  harassmentType: string;
+  detectedSeverity: string;
+  status: string;
+  university?: string;
+  specificLocation?: string;
+  narrative?: string;
+  proofUrls?: any[];
+  adminVerification?: any;
+  isRaggingIncident?: boolean;
+  rejectionReason?: string | null;
 }
 
 export async function getAdminIncidents(options: GetAdminIncidentsOptions = {}): Promise<{ success: boolean; data?: BriefAdminIncident[]; error?: string; total?: number }> {
@@ -341,43 +338,50 @@ export async function getAdminIncidents(options: GetAdminIncidentsOptions = {}):
   }
 }
 
-export async function getAdminIncidentDetails(postId: string): Promise<{ success: boolean; data?: AdminIncident; error?: string }> {
+export async function getAdminIncidentDetails(postId: string): Promise<{ success: boolean; data?: DetailAdminIncident; error?: string }> {
   try {
     const auth = await verifyAdminAuth()
     if (!auth.authorized) {
       return { success: false, error: auth.error || "Unauthorized" }
     }
 
-    const item = await dbConnect(collections.REPORTS).findOne({ postId });
+    const item = await dbConnect(collections.REPORTS).findOne(
+      { postId },
+      {
+        projection: {
+          postId: 1,
+          createdAt: 1,
+          harassmentType: 1,
+          detectedSeverity: 1,
+          status: 1,
+          university: 1,
+          specificLocation: 1,
+          narrative: 1,
+          "proofUrls.secureUrl": 1,
+          "proofUrls.resource_type": 1,
+          adminVerification: 1,
+          isRaggingIncident: 1,
+          rejectionReason: 1
+        }
+      }
+    );
     if (!item) {
       return { success: false, error: "Incident not found." };
     }
 
-    let priority: "High" | "Medium" | "Low" = "Low";
-    if (item.detectedSeverity === "HIGH") priority = "High";
-    else if (item.detectedSeverity === "MEDIUM") priority = "Medium";
-
-    const rawProofUrls = item.proofUrls ? item.proofUrls.map((p: any) => typeof p === "string" ? p : p.secureUrl || p) : [];
-    const verificationImage = rawProofUrls.length > 0
-      ? rawProofUrls[0]
-      : "https://lh3.googleusercontent.com/aida-public/AB6AXuB9cdHpv3GOvl0c7q95A5k6m55Vz610w-hOG1EpEIzTCnDgOnj9Xk2pp6XRtfNooYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHYnQw0l3Hq59xYsfUTe4PA05zr-pt14q1M8Qra_vTvGZj1qKJBFLsPei6koRlJiBIWJYMBvgfijB_BW7obY5qbvrg3bX5koYd3rs8qjWyFdUCTFUFkOUETk";
-
-    const data: AdminIncident = {
-      id: item.postId || "",
-      timestamp: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "",
-      category: item.harassmentType || "General Incident",
-      priority,
-      status: item?.status || "PENDING",
-      location: `${item.university || ""} • ${item.specificLocation || ""}`,
-      evidenceCount: rawProofUrls.length,
-      description: item.narrative || "",
-      verificationImage,
-      assignedInvestigator: item.adminVerification?.adminId || undefined,
-      disputeReason: item.adminVerification?.adminNote || undefined,
-      isRaggingIncident: item.isRaggingIncident ?? true,
-      rejectionReason: item.rejectionReason || null,
+    const data: DetailAdminIncident = {
+      postId: item.postId || "",
+      createdAt: item.createdAt || new Date(),
+      harassmentType: item.harassmentType || "General Incident",
+      detectedSeverity: item.detectedSeverity || "LOW",
+      status: item.status || "PENDING",
+      university: item.university || "",
+      specificLocation: item.specificLocation || "",
+      narrative: item.narrative || "",
+      proofUrls: item.proofUrls || [],
       adminVerification: item.adminVerification || null,
-      proofUrls: rawProofUrls,
+      isRaggingIncident: item.isRaggingIncident ?? false,
+      rejectionReason: item.rejectionReason || null,
     };
 
     return { success: true, data };
