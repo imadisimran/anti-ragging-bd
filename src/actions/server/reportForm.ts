@@ -36,55 +36,6 @@ export const generateSignature = async (paramsToSign: Record<string, any>) => {
     return signature;
 };
 
-export const aiVerification = async (narrative: string) => {
-
-    try {
-        const ai = new GoogleGenAI({});
-        const response = await ai.models.generateContent({
-            model: "gemini-3.1-flash-lite",
-            contents: `You are the core security and engineering AI layer for "Anti-Ragging Bangladesh." Your task is to process raw first-person reports of university ragging and output a strictly structured JSON object for public documentation.
-
-CRITICAL LANGUAGE & PERSPECTIVE RULES:
-1. LANGUAGE MATCHING: You must output the "sanitizedTitle" and "sanitizedDescription" in the EXACT same language and script style as the input text. 
-   - If the input is in Bangla script (বাংলা), the output must be in Bangla script.
-   - If the input is in English, the output must be in English.
-   - If the input is in Banglish (Bengali written using the Latin alphabet, e.g., "amake rater bela daka hoyechelo"), the output must be strictly in Banglish, matching the phonetic style of the user.
-2. FIRST-PERSON VIEW: Keep the narrative strictly in the FIRST-PERSON PERSPECTIVE ("I", "আমার", "amake", "amari"). Do not convert the story to third-person. Preserve the exact emotional weight, timelines, specific room numbers, and locations.
-
-ABSOLUTE SAFETY & MODERATION RULES:
-1. REMOVE PROFANITY: Completely strip out or rephrase any explicit slang, vulgarities, or political slogans while preserving the underlying factual narrative.
-2. SEAMLESS DEFAMATION SHIELD (NO BRACKETS): You must protect individual identities and prevent political weaponization by omitting or generalizing targeted names. 
-   - DO NOT use brackets (e.g., do not write "[a senior student]"). 
-   - Replace explicit specific individual names or political student wing affiliations with seamless generic terms that flow naturally in the sentence.
-   - Example 1 (Banglish): "Khaled namer ek boro vai" -> "ek boro vai".
-   - Example 2 (English): If 5 individual names are listed ("Asif, Fahim, Siyam, Joy, and Tanvir") -> change to "5 senior students".
-   - Example 3 (Bangla): "ছাত্রলীগের ইমতিয়াজ আর সাজিদ" -> "রাজনৈতিক সংগঠনের দুই বড় ভাই" or "দুইজন বড় ভাই".
-
-You must respond ONLY with a JSON object matching this schema:
-{
-  "isRaggingIncident": boolean, // true if the text describes actual ragging, physical/mental abuse, or forced attendance. false if it is an unrelated academic complaint.
-  "sanitizedTitle": "string", // A clean headline summarizing the incident matching the input language/script.
-  "sanitizedDescription": "string", // The first-person, seamlessly redacted, profanity-free narrative matching the input language/script. No brackets allowed.
-  "detectedSeverity": "LOW" | "MEDIUM" | "HIGH", // HIGH if physical harm, confinement, or extreme mental torture is detailed.
-  "rejectionReason": "string" | null // If isRaggingIncident is false, provide a short reason in English for the human admin review queue.
-}
-
-Incident: ${narrative}
-
-Don't return anything except json format.`,
-        });
-
-        // console.log(response.text)
-
-        const result: AiVerificationResult = JSON.parse(response.text || "")
-        result.success = true
-        return result
-    } catch (error) {
-        console.log(error)
-        return { success: false }
-    }
-}
-
 export const postReport = async (reportData: FormData) => {
     const session = await getServerSession(authOptions)
     try {
@@ -119,8 +70,6 @@ export const postReport = async (reportData: FormData) => {
             };
         }
 
-        const aiResult = await aiVerification(narrative);
-
         const emailSearchHash = generateBlindIndex(session?.user?.email || "")
 
         const studentInfo = await dbConnect(collections.USERS).findOne({ emailSearchHash }, { projection: { userId: 1, studentDetails: 1, reportingBanUntil: 1 } })
@@ -132,6 +81,7 @@ export const postReport = async (reportData: FormData) => {
             };
         }
 
+        // Initialize report parameters into a persistent QUEUED status configuration block
         const payload: ReportPayload = {
             university,
             dateTime: new Date(dateTime),
@@ -141,13 +91,13 @@ export const postReport = async (reportData: FormData) => {
             narrative,
             proofUrls,
             createdAt: new Date(),
-            isRaggingIncident: aiResult.success ? aiResult.isRaggingIncident : false,
-            detectedSeverity: aiResult.success ? aiResult.detectedSeverity : "LOW",
-            rejectionReason: aiResult.success ? aiResult.rejectionReason : null,
-            verifiedBy: aiResult.success ? "Ai" : "",
-            status: aiResult.success ? "SUBMITTED" : "PENDING",
-            sanitizedTitle: aiResult.success ? aiResult.sanitizedTitle : "",
-            sanitizedDescription: aiResult.success ? aiResult.sanitizedDescription : "",
+            isRaggingIncident: false, 
+            detectedSeverity: "LOW",  
+            rejectionReason: null,
+            verifiedBy: "",
+            status: "QUEUED",    
+            sanitizedTitle: "",         
+            sanitizedDescription: "",  
             adminVerification: null,
             upVotesCount: 0,
             upVotesBy: [],
@@ -161,10 +111,10 @@ export const postReport = async (reportData: FormData) => {
             updatedAt: [
                 {
                     timestamp: new Date(),
-                    status: aiResult.success ? "SUBMITTED" : "PENDING",
-                    verifiedBy: aiResult.success ? "Ai" : "",
+                    status: "QUEUED" as any,
+                    verifiedBy: "System",
                     adminId: null,
-                    note: aiResult.rejectionReason ? aiResult.rejectionReason : null
+                    note: "Report submitted and enqueued for multi-modal AI investigation."
                 }
             ]
         };
@@ -172,11 +122,25 @@ export const postReport = async (reportData: FormData) => {
         const result = await dbConnect(collections.REPORTS).insertOne(payload)
 
         if (result.acknowledged) {
+            // Asynchronously wake up the 24/7 standalone worker processing thread
+            // We omit "await" here to return a rapid UI confirmation banner to the student
+            const workerUrl = process.env.BACKGROUND_WORKER_URL || "http://localhost:4000";
+
+            fetch(`${workerUrl}/webhook/new-report`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ complaintId: result.insertedId.toString() })
+            }).catch((err) => {
+                // Catches isolated network connection drops so your frontend process doesn't fail
+                console.error("[Worker Webhook Ping Failed]:", err);
+            });
+
             return {
                 success: true,
-                message: "Report submitted successfully"
+                message: "Report submitted successfully. Verification processing is running in the background."
             }
         }
+
         return {
             success: false,
             message: "Failed to submit report"

@@ -1,4 +1,3 @@
-import { ObjectId } from "mongodb"
 
 export interface GetLocation {
     _id: string,
@@ -6,7 +5,6 @@ export interface GetLocation {
 }
 
 export interface AiVerificationResult {
-    success: boolean
     isRaggingIncident?: boolean;
     sanitizedTitle?: string;
     sanitizedDescription?: string;
@@ -29,7 +27,7 @@ export interface ReportPayload {
     detectedSeverity?: "LOW" | "MEDIUM" | "HIGH";
     rejectionReason?: string | null;
     verifiedBy?: string;
-    status: "PENDING" | "SUBMITTED" | "REJECTED";
+    status: "QUEUED" | "PROCESSING" | "PENDING" | "SUBMITTED" | "REJECTED";
     adminVerification: {
         isRequested: boolean;
         appealNote: string;
@@ -49,11 +47,10 @@ export interface ReportPayload {
     };
     updatedAt: {
         timestamp: Date;
-        status: "PENDING" | "SUBMITTED" | "REJECTED" | "RESOLVED";
+        status: "QUEUED" | "PROCESSING" | "PENDING" | "SUBMITTED" | "REJECTED" | "RESOLVED";
         verifiedBy: string;
         adminId: string | null;
-        note: string | null
-
+        note: string | null;
     }[];
     upVotesCount: number;
     upVotesBy: string[]
