@@ -238,6 +238,22 @@ export async function banReporter(
   }
 }
 
+export interface BriefAdminIncident {
+  postId: string;
+  createdAt: Date;
+  harassmentType: string;
+  detectedSeverity: string;
+  status: string;
+}
+
+export interface GetAdminIncidentsOptions {
+  limit?: number;
+  skip?: number;
+  searchQuery?: string;
+  priorityFilter?: string;
+  statusFilter?: string;
+}
+
 export interface AdminIncident {
   id: string;
   timestamp: string;
@@ -256,50 +272,117 @@ export interface AdminIncident {
   proofUrls: string[];
 }
 
-export async function getAdminIncidents(): Promise<{ success: boolean; data?: AdminIncident[]; error?: string }> {
+export async function getAdminIncidents(options: GetAdminIncidentsOptions = {}): Promise<{ success: boolean; data?: BriefAdminIncident[]; error?: string; total?: number }> {
   try {
     const auth = await verifyAdminAuth()
     if (!auth.authorized) {
       return { success: false, error: auth.error || "Unauthorized" }
     }
 
-    const rawReports = await dbConnect(collections.REPORTS).find({}).toArray()
+    const { limit = 5, skip = 0, searchQuery = "", priorityFilter = "All", statusFilter = "All" } = options;
 
-    const data: AdminIncident[] = rawReports.map((item) => {
-      let priority: "High" | "Medium" | "Low" = "Low";
-      if (item.detectedSeverity === "HIGH") priority = "High";
-      else if (item.detectedSeverity === "MEDIUM") priority = "Medium";
+    const query: any = {};
 
-      const rawProofUrls = item.proofUrls ? item.proofUrls.map((p: any) => typeof p === "string" ? p : p.secureUrl || p) : [];
-      const verificationImage = rawProofUrls.length > 0
-        ? rawProofUrls[0]
-        : "https://lh3.googleusercontent.com/aida-public/AB6AXuB9cdHpv3GOvl0c7q95A5k6m55Vz610w-hOG1EpEIzTCnDgOnj9Xk2pp6XRtfNooYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHYnQw0l3Hq59xYsfUTe4PA05zr-pt14q1M8Qra_vTvGZj1qKJBFLsPei6koRlJiBIWJYMBvgfijB_BW7obY5qbvrg3bX5koYd3rs8qjWyFdUCTFUFkOUETk";
+    // status filter
+    if (statusFilter === "All") {
+      query.isRaggingIncident = true;
+    } else {
+      query.status = statusFilter;
+    }
 
-      return {
-        id: item.postId || "",
-        timestamp: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "",
-        category: item.harassmentType || "General Incident",
-        priority,
-        status: item.status || "NEW",
-        location: `${item.university || ""} • ${item.specificLocation || ""}`,
-        evidenceCount: rawProofUrls.length,
-        description: item.narrative || "",
-        verificationImage,
-        assignedInvestigator: item.adminVerification?.adminId || undefined,
-        disputeReason: item.adminVerification?.adminNote || undefined,
-        isRaggingIncident: item.isRaggingIncident ?? true,
-        rejectionReason: item.rejectionReason || null,
-        adminVerification: item.adminVerification || null,
-        proofUrls: rawProofUrls,
-      };
-    });
+    // priority filter
+    if (priorityFilter !== "All") {
+      let severity = "LOW";
+      if (priorityFilter === "High") severity = "HIGH";
+      else if (priorityFilter === "Medium") severity = "MEDIUM";
+      query.detectedSeverity = severity;
+    }
 
-    // Sort by id descending
-    data.sort((a, b) => b.id.localeCompare(a.id));
+    // search filter
+    if (searchQuery) {
+      const searchRegex = { $regex: searchQuery, $options: "i" };
+      query.$or = [
+        { postId: searchRegex },
+        { harassmentType: searchRegex },
+        { university: searchRegex },
+        { specificLocation: searchRegex },
+        { narrative: searchRegex }
+      ];
+    }
 
-    return { success: true, data };
+    const rawReports = await dbConnect(collections.REPORTS)
+      .find(query)
+      .project({
+        postId: 1,
+        createdAt: 1,
+        harassmentType: 1,
+        detectedSeverity: 1,
+        status: 1
+      })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    const total = await dbConnect(collections.REPORTS).countDocuments(query);
+
+    const data: BriefAdminIncident[] = rawReports.map((item) => ({
+      postId: item.postId || "",
+      createdAt: item.createdAt || new Date(),
+      harassmentType: item.harassmentType || "General Incident",
+      detectedSeverity: item.detectedSeverity || "LOW",
+      status: item.status || "PENDING",
+    }));
+
+    return { success: true, data, total };
   } catch (error) {
     console.error("Error in getAdminIncidents server action:", error);
     return { success: false, error: "Failed to fetch incidents list." };
+  }
+}
+
+export async function getAdminIncidentDetails(postId: string): Promise<{ success: boolean; data?: AdminIncident; error?: string }> {
+  try {
+    const auth = await verifyAdminAuth()
+    if (!auth.authorized) {
+      return { success: false, error: auth.error || "Unauthorized" }
+    }
+
+    const item = await dbConnect(collections.REPORTS).findOne({ postId });
+    if (!item) {
+      return { success: false, error: "Incident not found." };
+    }
+
+    let priority: "High" | "Medium" | "Low" = "Low";
+    if (item.detectedSeverity === "HIGH") priority = "High";
+    else if (item.detectedSeverity === "MEDIUM") priority = "Medium";
+
+    const rawProofUrls = item.proofUrls ? item.proofUrls.map((p: any) => typeof p === "string" ? p : p.secureUrl || p) : [];
+    const verificationImage = rawProofUrls.length > 0
+      ? rawProofUrls[0]
+      : "https://lh3.googleusercontent.com/aida-public/AB6AXuB9cdHpv3GOvl0c7q95A5k6m55Vz610w-hOG1EpEIzTCnDgOnj9Xk2pp6XRtfNooYHO84Njzj6y-YzDIWDMg80c4AlF30sUk0KaxQxXg-nP8eq9SuNQ_jFyBSoV8hWv-2it5jraY-qyuWcuP3ESAsrYHYnQw0l3Hq59xYsfUTe4PA05zr-pt14q1M8Qra_vTvGZj1qKJBFLsPei6koRlJiBIWJYMBvgfijB_BW7obY5qbvrg3bX5koYd3rs8qjWyFdUCTFUFkOUETk";
+
+    const data: AdminIncident = {
+      id: item.postId || "",
+      timestamp: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "",
+      category: item.harassmentType || "General Incident",
+      priority,
+      status: item?.status || "PENDING",
+      location: `${item.university || ""} • ${item.specificLocation || ""}`,
+      evidenceCount: rawProofUrls.length,
+      description: item.narrative || "",
+      verificationImage,
+      assignedInvestigator: item.adminVerification?.adminId || undefined,
+      disputeReason: item.adminVerification?.adminNote || undefined,
+      isRaggingIncident: item.isRaggingIncident ?? true,
+      rejectionReason: item.rejectionReason || null,
+      adminVerification: item.adminVerification || null,
+      proofUrls: rawProofUrls,
+    };
+
+    return { success: true, data };
+  } catch (error) {
+    console.error("Error in getAdminIncidentDetails server action:", error);
+    return { success: false, error: "Failed to fetch incident details." };
   }
 }

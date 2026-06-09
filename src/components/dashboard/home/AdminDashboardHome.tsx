@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   AlertTriangle,
   Hourglass,
@@ -12,14 +12,14 @@ import {
   ChevronDown,
   Loader2,
 } from "lucide-react";
-import { getAdminIncidents } from "@/actions/server/admin";
+import { getAdminIncidents, getAdminIncidentDetails, BriefAdminIncident } from "@/actions/server/admin";
 import StatusBadge from "@/components/badge/StatusConfigBadge";
 import PriorityBadge from "@/components/badge/PriorityConfigBadge";
 import AdminIncidentModal, { Incident } from "@/components/modal/AdminIncidentModal";
 
 
 export default function AdminDashboardHome() {
-  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [incidents, setIncidents] = useState<BriefAdminIncident[]>([]);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   // DB status loader state
@@ -32,73 +32,108 @@ export default function AdminDashboardHome() {
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  // Infinite scroll state
+  const [hasMore, setHasMore] = useState(true);
+  const [isScrollingLoading, setIsScrollingLoading] = useState(false);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const sentinelRef = useRef<HTMLTableRowElement | null>(null);
 
-
-
-  // Load incidents on mount
+  // Load first page on mount or filter change
   useEffect(() => {
+    let active = true;
     const loadData = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const res = await getAdminIncidents();
+        const res = await getAdminIncidents({
+          limit: 5,
+          skip: 0,
+          searchQuery,
+          priorityFilter,
+          statusFilter
+        });
+        if (!active) return;
         if (res.success && res.data) {
-          setIncidents(res.data as Incident[]);
+          setIncidents(res.data);
+          setHasMore(res.data.length === 5);
+          setTotalCount(res.total || 0);
         } else {
           setError(res.error || "Failed to load incidents data.");
         }
       } catch (err) {
         console.error(err);
-        setError("An unexpected error occurred while fetching incidents.");
+        if (active) setError("An unexpected error occurred while fetching incidents.");
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
     loadData();
-  }, []);
+    return () => {
+      active = false;
+    };
+  }, [searchQuery, priorityFilter, statusFilter]);
 
-
-
-
-  // Filtered incidents
-  const filteredIncidents = incidents.filter((incident) => {
-    const matchesSearch =
-      incident.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      incident.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      incident.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      incident.description.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesPriority =
-      priorityFilter === "All" || incident.priority === priorityFilter;
-
-    let matchesStatus = false;
-    if (statusFilter === "All") {
-      matchesStatus = incident.isRaggingIncident === true;
-    } else {
-      matchesStatus = incident.status === statusFilter;
+  const loadMore = async () => {
+    if (isScrollingLoading || !hasMore) return;
+    setIsScrollingLoading(true);
+    try {
+      const nextSkip = incidents.length;
+      const res = await getAdminIncidents({
+        limit: 5,
+        skip: nextSkip,
+        searchQuery,
+        priorityFilter,
+        statusFilter
+      });
+      if (res.success && res.data) {
+        setIncidents((prev) => [...prev, ...res.data!]);
+        setHasMore(res.data.length === 5);
+        setTotalCount(res.total || 0);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsScrollingLoading(false);
     }
+  };
 
-    return matchesSearch && matchesPriority && matchesStatus;
-  });
-
-  // Paginated incidents
-  const totalPages = Math.ceil(filteredIncidents.length / itemsPerPage);
-  const paginatedIncidents = filteredIncidents.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  // Adjust page number if filtered list shrinks
+  // Setup Intersection Observer for infinite scrolling
   useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(totalPages);
-    }
-  }, [filteredIncidents.length, totalPages, currentPage]);
+    if (!sentinelRef.current || isScrollingLoading || !hasMore) return;
 
-  const handleRowClick = (incident: Incident) => {
-    setSelectedIncident(incident);
-    setIsModalOpen(true);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(sentinelRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [hasMore, isScrollingLoading, incidents.length, searchQuery, priorityFilter, statusFilter]);
+
+  const handleRowClick = async (postId: string) => {
+    setIsDetailLoading(true);
+    try {
+      const res = await getAdminIncidentDetails(postId);
+      if (res.success && res.data) {
+        setSelectedIncident(res.data as Incident);
+        setIsModalOpen(true);
+      } else {
+        alert(res.error || "Failed to load incident details.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An unexpected error occurred while loading details.");
+    } finally {
+      setIsDetailLoading(false);
+    }
   };
 
   const handleCloseModal = () => {
@@ -144,7 +179,7 @@ export default function AdminDashboardHome() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-gutter mb-stack-lg">
         {/* Pending Incidents */}
         <div
-          onClick={() => { setStatusFilter("PENDING"); setCurrentPage(1); }}
+          onClick={() => { setStatusFilter("PENDING"); }}
           className={`bg-white border-l-[6px] border-l-error border border-outline-variant p-5 rounded-lg shadow-sm hover:border-error transition-all group cursor-pointer hover:-translate-y-0.5 duration-200 ${statusFilter === "PENDING" ? "ring-5 ring-error/50 bg-red-50/10" : ""}`}
         >
           <div className="flex justify-between items-start mb-2">
@@ -157,8 +192,8 @@ export default function AdminDashboardHome() {
 
         {/* Active Investigations */}
         <div
-          onClick={() => { setStatusFilter("INVESTIGATING"); setCurrentPage(1); }}
-          className={`bg-white border-l-[6px] border-l-amber-500 border border-outline-variant p-5 rounded-lg shadow-sm hover:border-amber-500 transition-all group cursor-pointer hover:-translate-y-0.5 duration-200 ${statusFilter === "INVESTIGATING" ? "ring-2 ring-amber-500/50 bg-amber-50/10" : ""}`}
+          onClick={() => { setStatusFilter("INVESTIGATING"); }}
+          className={`bg-white border-l-[6px] border-l-amber-500 border border-outline-variant p-5 rounded-lg shadow-sm hover:border-amber-500 transition-all group cursor-pointer hover:-translate-y-0.5 duration-200 ${statusFilter === "INVESTIGATING" ? "ring-5 ring-amber-500/50 bg-amber-50/10" : ""}`}
         >
           <div className="flex justify-between items-start mb-2">
             <Hourglass className="w-5 h-5 text-amber-600 group-hover:scale-110 transition-transform" />
@@ -170,8 +205,8 @@ export default function AdminDashboardHome() {
 
         {/* Disputed Claims */}
         <div
-          onClick={() => { setStatusFilter("DISPUTED"); setCurrentPage(1); }}
-          className={`bg-white border-l-[6px] border-l-rose-700 border border-outline-variant p-5 rounded-lg shadow-sm hover:border-rose-700 transition-all group cursor-pointer hover:-translate-y-0.5 duration-200 ${statusFilter === "DISPUTED" ? "ring-2 ring-rose-700/50 bg-rose-50/10" : ""}`}
+          onClick={() => { setStatusFilter("DISPUTED"); }}
+          className={`bg-white border-l-[6px] border-l-rose-700 border border-outline-variant p-5 rounded-lg shadow-sm hover:border-rose-700 transition-all group cursor-pointer hover:-translate-y-0.5 duration-200 ${statusFilter === "DISPUTED" ? "ring-5 ring-rose-700/50 bg-rose-50/10" : ""}`}
         >
           <div className="flex justify-between items-start mb-2">
             <AlertTriangle className="w-5 h-5 text-rose-700 group-hover:scale-110 transition-transform" />
@@ -199,7 +234,7 @@ export default function AdminDashboardHome() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-outline w-4 h-4" />
               <input
                 value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                onChange={(e) => { setSearchQuery(e.target.value); }}
                 className="pl-9 pr-4 py-2 bg-white border border-outline-variant text-body-md rounded-md focus:outline-none focus:border-secondary w-full sm:w-64 placeholder-on-surface-variant/40"
                 placeholder="Search Incident Log..."
                 type="text"
@@ -231,7 +266,7 @@ export default function AdminDashboardHome() {
                         {["All", "High", "Medium", "Low"].map((p) => (
                           <button
                             key={p}
-                            onClick={() => { setPriorityFilter(p); setCurrentPage(1); }}
+                            onClick={() => { setPriorityFilter(p); }}
                             className={`px-3 py-1 text-xs rounded-full font-semibold border cursor-pointer transition-all ${priorityFilter === p
                               ? "bg-primary text-white border-primary"
                               : "bg-slate-50 text-on-surface-variant border-outline-variant hover:bg-slate-100"
@@ -249,7 +284,7 @@ export default function AdminDashboardHome() {
                         {["All", "PENDING", "INVESTIGATING", "DISPUTED", "RESOLVED"].map((s) => (
                           <button
                             key={s}
-                            onClick={() => { setStatusFilter(s); setCurrentPage(1); }}
+                            onClick={() => { setStatusFilter(s); }}
                             className={`px-2.5 py-1 text-xs rounded-full font-semibold border cursor-pointer transition-all ${statusFilter === s
                               ? "bg-secondary text-white border-secondary"
                               : "bg-slate-50 text-on-surface-variant border-outline-variant hover:bg-slate-100"
@@ -268,7 +303,6 @@ export default function AdminDashboardHome() {
                         onClick={() => {
                           setPriorityFilter("All");
                           setStatusFilter("All");
-                          setCurrentPage(1);
                           setShowFilterDropdown(false);
                         }}
                         className="text-xs text-on-surface-variant hover:text-primary font-bold cursor-pointer"
@@ -307,38 +341,68 @@ export default function AdminDashboardHome() {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant">
-              {paginatedIncidents.length > 0 ? (
-                paginatedIncidents.map((incident) => {
-                  const isHigh = incident.priority === "High";
-                  const isMedium = incident.priority === "Medium";
+              {incidents.length > 0 ? (
+                <>
+                  {incidents.map((incident) => {
+                    const formattedDate = incident.createdAt
+                      ? new Date(incident.createdAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "";
+                    const mappedPriority =
+                      incident.detectedSeverity === "HIGH"
+                        ? "High"
+                        : incident.detectedSeverity === "MEDIUM"
+                        ? "Medium"
+                        : "Low";
 
-                  return (
-                    <tr
-                      key={incident.id}
-                      onClick={() => handleRowClick(incident)}
-                      className="hover:bg-slate-50/80 cursor-pointer transition-colors duration-150 group"
-                    >
-                      <td className="px-6 py-4 text-label-md font-bold text-primary group-hover:text-secondary transition-colors">
-                        {incident.id}
-                      </td>
-                      <td className="px-6 py-4 text-body-md text-on-surface-variant">
-                        {incident.timestamp}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-body-md text-on-surface font-semibold">{incident.category.toUpperCase()}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <PriorityBadge priority={incident.priority} />
-                      </td>
-                      <td className="px-6 py-4">
-                        <StatusBadge status={incident.status} />
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <ChevronRight className="w-5 h-5 text-outline opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                    return (
+                      <tr
+                        key={incident.postId}
+                        onClick={() => handleRowClick(incident.postId)}
+                        className="hover:bg-slate-50/80 cursor-pointer transition-colors duration-150 group animate-in fade-in slide-in-from-bottom-1 duration-200"
+                      >
+                        <td className="px-6 py-4 text-label-md font-bold text-primary group-hover:text-secondary transition-colors">
+                          {incident.postId}
+                        </td>
+                        <td className="px-6 py-4 text-body-md text-on-surface-variant">
+                          {formattedDate}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-body-md text-on-surface font-semibold">
+                            {incident.harassmentType.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <PriorityBadge priority={mappedPriority} />
+                        </td>
+                        <td className="px-6 py-4">
+                          <StatusBadge status={incident.status as any} />
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <ChevronRight className="w-5 h-5 text-outline opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {/* Sentinel element for infinite scroll */}
+                  {hasMore && (
+                    <tr ref={sentinelRef} className="hover:bg-transparent">
+                      <td colSpan={6} className="px-6 py-6 text-center">
+                        <div className="flex items-center justify-center gap-2 py-2">
+                          <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                          <span className="text-sm text-on-surface-variant font-medium">
+                            Loading more incidents...
+                          </span>
+                        </div>
                       </td>
                     </tr>
-                  );
-                })
+                  )}
+                </>
               ) : (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-on-surface-variant/60 font-body-lg">
@@ -363,45 +427,17 @@ export default function AdminDashboardHome() {
           </table>
         </div>
 
-        {/* Pagination Footer */}
-        {totalPages > 1 && (
-          <div className="p-4 border-t border-outline-variant flex justify-between items-center bg-slate-50 text-label-sm font-bold text-outline">
-            <span>
-              Showing {Math.min(filteredIncidents.length, (currentPage - 1) * itemsPerPage + 1)}-
-              {Math.min(filteredIncidents.length, currentPage * itemsPerPage)} of {filteredIncidents.length} reports
+        {/* Infinite Scroll Footer */}
+        <div className="p-4 border-t border-outline-variant flex justify-between items-center bg-slate-50 text-label-sm font-bold text-outline">
+          <span>
+            Showing {incidents.length} of {totalCount} reports
+          </span>
+          {!hasMore && incidents.length > 0 && (
+            <span className="text-xs text-on-surface-variant/60 font-medium italic">
+              All incidents loaded
             </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setCurrentPage((c) => Math.max(1, c - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 border border-outline rounded bg-white hover:bg-slate-100 disabled:opacity-50 disabled:hover:bg-white text-on-surface cursor-pointer flex items-center gap-1 transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                Previous
-              </button>
-              {Array.from({ length: totalPages }).map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setCurrentPage(i + 1)}
-                  className={`px-3 py-1.5 border rounded cursor-pointer transition-colors ${currentPage === i + 1
-                    ? "bg-primary text-white border-primary"
-                    : "bg-white hover:bg-slate-100 border-outline text-on-surface"
-                    }`}
-                >
-                  {i + 1}
-                </button>
-              ))}
-              <button
-                onClick={() => setCurrentPage((c) => Math.min(totalPages, c + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 border border-outline rounded bg-white hover:bg-slate-100 disabled:opacity-50 disabled:hover:bg-white text-on-surface cursor-pointer flex items-center gap-1 transition-colors"
-              >
-                Next
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <AdminIncidentModal
@@ -410,11 +446,20 @@ export default function AdminDashboardHome() {
         onClose={handleCloseModal}
         onUpdateIncident={(updatedIncident) => {
           setIncidents((prev) =>
-            prev.map((i) => (i.id === updatedIncident.id ? updatedIncident : i))
+            prev.map((i) => (i.postId === updatedIncident.id ? { ...i, status: updatedIncident.status } : i))
           );
           setSelectedIncident(updatedIncident);
         }}
       />
+
+      {isDetailLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-xs">
+          <div className="bg-white p-6 rounded-lg shadow-xl flex items-center gap-3">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            <span className="text-body-md font-bold text-primary">Fetching report details...</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

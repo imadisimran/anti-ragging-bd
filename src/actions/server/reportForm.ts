@@ -124,7 +124,7 @@ export const postReport = async (reportData: FormData) => {
         if (result.acknowledged) {
             // Asynchronously wake up the 24/7 standalone worker processing thread
             // We omit "await" here to return a rapid UI confirmation banner to the student
-            const workerUrl = process.env.BACKGROUND_WORKER_URL || "http://localhost:4000";
+            const workerUrl = process.env.BACKGROUND_WORKER_URL
 
             fetch(`${workerUrl}/webhook/new-report`, {
                 method: "POST",
