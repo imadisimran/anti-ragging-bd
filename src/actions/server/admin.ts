@@ -4,6 +4,7 @@ import { dbConnect, collections } from "@/lib/dbConnect"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/authOptions"
 import { MyDetailedReport } from "./my-reports"
+import { decryptData, generateBlindIndex } from "@/lib/encryption"
 
 export interface AppealsResponse {
   success: boolean;
@@ -455,5 +456,143 @@ export async function getAdminIncidentDetails(postId: string): Promise<{ success
   } catch (error) {
     console.error("Error in getAdminIncidentDetails server action:", error);
     return { success: false, error: "Failed to fetch incident details." };
+  }
+}
+
+export interface GetUsersOptions {
+  limit?: number;
+  skip?: number;
+  searchQuery?: string;
+  roleFilter?: string; // "All", "student", "AUTHORITY", "ADMIN"
+}
+
+export async function getRegisteredUsers(options: GetUsersOptions = {}) {
+  try {
+    const auth = await verifyAdminAuth();
+    if (!auth.authorized) {
+      return { success: false, error: auth.error || "Unauthorized" };
+    }
+
+    const { limit = 10, skip = 0, searchQuery = "", roleFilter = "All" } = options;
+
+    const query: any = {};
+
+    // Apply role filter
+    if (roleFilter !== "All") {
+      query.role = roleFilter;
+    }
+
+    // Apply search query
+    if (searchQuery) {
+      if (searchQuery.includes("@")) {
+        const emailHash = generateBlindIndex(searchQuery);
+        query.$or = [
+          { emailSearchHash: emailHash },
+          { email: { $regex: searchQuery, $options: "i" } }
+        ];
+      } else {
+        const searchRegex = { $regex: searchQuery, $options: "i" };
+        query.$or = [
+          { userId: searchRegex },
+          { name: searchRegex },
+          { email: searchRegex },
+          { "authorityDetails.designation": searchRegex },
+          { "authorityDetails.university": searchRegex },
+          { "authorityDetails.hall": searchRegex }
+        ];
+      }
+    }
+
+    const rawUsers = await dbConnect(collections.USERS)
+      .find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    const total = await dbConnect(collections.USERS).countDocuments(query);
+
+    const data = rawUsers.map((item) => {
+      const isStudent = item.role === "student" || !item.role;
+      let name = item.name || "";
+      let email = item.email || "";
+
+      if (isStudent) {
+        try {
+          name = decryptData(item.name);
+        } catch {
+          name = item.name || "";
+        }
+        try {
+          email = decryptData(item.email);
+        } catch {
+          email = item.email || "";
+        }
+      }
+
+      return {
+        id: item._id.toString(),
+        userId: item.userId || "",
+        name,
+        email,
+        role: item.role || "student",
+        createdAt: item.createdAt || new Date(),
+        isVerified: item.isVerified || false,
+        authorityDetails: item.authorityDetails || null,
+        studentDetails: item.studentDetails || null
+      };
+    });
+
+    return { success: true, data, total };
+  } catch (error: any) {
+    console.error("Error in getRegisteredUsers:", error);
+    return { success: false, error: error.message || "Failed to fetch users." };
+  }
+}
+
+export async function setupAuthorityProfile(
+  userId: string,
+  data: {
+    name: string;
+    email: string;
+    designation: string;
+    university: string;
+    hall: string;
+  }
+) {
+  try {
+    const auth = await verifyAdminAuth();
+    if (!auth.authorized) {
+      return { success: false, error: auth.error || "Unauthorized" };
+    }
+
+    if (!data.name || !data.email || !data.designation || !data.university || !data.hall) {
+      return { success: false, error: "All profile setup fields are required." };
+    }
+
+    const result = await dbConnect(collections.USERS).updateOne(
+      { userId },
+      {
+        $set: {
+          role: "AUTHORITY",
+          name: data.name,
+          email: data.email,
+          emailSearchHash: generateBlindIndex(data.email),
+          authorityDetails: {
+            designation: data.designation,
+            university: data.university,
+            hall: data.hall
+          }
+        }
+      }
+    );
+
+    if (result.matchedCount > 0) {
+      return { success: true, message: "Authority profile successfully configured." };
+    }
+    return { success: false, error: "User not found." };
+  } catch (error: any) {
+    console.error("Error in setupAuthorityProfile:", error);
+    return { success: false, error: error.message || "Failed to configure authority profile." };
   }
 }

@@ -18,10 +18,11 @@ export const authOptions: NextAuthOptions = {
         }
         const result = await loginUser({ email: credentials?.email, password: credentials?.password });
         if (result.success && result.user) {
+          const isStudent = result.user.role === "student" || !result.user.role;
           const user = {
             id: result.user.userId,
-            name: decryptData(result.user.name),
-            email: decryptData(result.user.email),
+            name: isStudent ? decryptData(result.user.name) : result.user.name,
+            email: isStudent ? decryptData(result.user.email) : result.user.email,
             userId: result.user.userId,
             role: result.user.role,
             isVerified: result?.user?.isVerified ?? false,

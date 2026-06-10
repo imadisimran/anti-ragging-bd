@@ -6,6 +6,7 @@ import NavLinkDashboard from "@/components/layout/NavLinkDashboard";
 import { 
   Home, 
   User, 
+  Users,
   FileText, 
   MessageSquare, 
   HelpCircle, 
@@ -75,9 +76,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </NavLinkDashboard>
 
           {role === "ADMIN" && (
-            <NavLinkDashboard href="/dashboard/appeals" isCollapsed={isCollapsed} icon={<Scale className="w-5 h-5 flex-shrink-0" />}>
-              Appeals
-            </NavLinkDashboard>
+            <>
+              <NavLinkDashboard href="/dashboard/appeals" isCollapsed={isCollapsed} icon={<Scale className="w-5 h-5 flex-shrink-0" />}>
+                Appeals
+              </NavLinkDashboard>
+              <NavLinkDashboard href="/dashboard/user-management" isCollapsed={isCollapsed} icon={<Users className="w-5 h-5 flex-shrink-0" />}>
+                User Registry
+              </NavLinkDashboard>
+            </>
           )}
 
           <NavLinkDashboard href="#" isCollapsed={isCollapsed} icon={<MessageSquare className="w-5 h-5 flex-shrink-0" />}>

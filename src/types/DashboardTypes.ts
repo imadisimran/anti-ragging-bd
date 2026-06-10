@@ -18,6 +18,26 @@ export interface Incident {
 
 export interface ProofUrlType { secureUrl: string; resource_type: string }
 
+export interface AuthorityReview {
+  userId: string;
+  name: string;
+  designation: string;
+  status: "INVESTIGATING" | "FAKE" | "RESOLVED";
+  comment: string;
+  timestamp: Date;
+}
+
+export interface ReportComment {
+  commentId: string;
+  authorId: string;
+  authorName: string;
+  authorRole: string; // "student" or designation
+  isAuthority: boolean;
+  content: string;
+  timestamp: Date;
+  parentId?: string; // For threaded replies
+}
+
 export interface AdminIncidentModalProps {
     isOpen: boolean;
     incident: Incident | null;

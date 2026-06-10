@@ -38,6 +38,11 @@ export interface DBuser {
   isVerified: boolean;
   password?: string;
   isProfileComplete?: boolean;
+  authorityDetails?: {
+    designation: string;
+    university: string;
+    hall: string;
+  };
 }
 
 export interface LoginUserReturn {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   BadgeCheck,
   Shield,
@@ -13,6 +13,8 @@ import {
   ClipboardList
 } from "lucide-react";
 import Swal from "sweetalert2";
+import { getAuthorityProfile } from "@/actions/server/authority";
+import { updateStudentPassword } from "@/actions/server/profile";
 
 interface ProfileData {
   name: string;
@@ -26,14 +28,33 @@ interface ProfileData {
 
 export default function AuthoritiesProfile() {
   const [profile, setProfile] = useState<ProfileData>({
-    name: "DR. AHMED MANSUR",
-    role: "SENIOR HALL PROVOST",
-    department: "Department of Sociology",
-    oversight: "Jagannath Hall",
-    designation: "Primary Investigator (Level 3)",
-    email: "a.mansur@university-edu.bd",
+    name: "Loading...",
+    role: "AUTHORITY",
+    department: "...",
+    oversight: "...",
+    designation: "Please Wait",
+    email: "...",
     image: "https://lh3.googleusercontent.com/aida-public/AB6AXuB5oskI4OkPzf5oLeAH1FLk55TwnpTvDtg1lWMO7m0wssIhhvHnBJ7t_LMlZ4E58S1MeCqr7anOLRd4RyY9TYsc7hQoLKXoz2KgFo9UHzCbB5dwX-0GfofprXogfEwPLpdBa7IBuWhDVfjB-3J3knG380CSpDstP2ImRRemVO89lgMQYakHA0C3tkQuHjQG95X04SG4NRayvtZXy9jy8my88pSAYPYcD3ULHdGvqm1xHDfHtJkF2zOuahwWD0F-CL8gpB3S90nXop0"
   });
+
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getAuthorityProfile().then((res) => {
+      if (res.success && res.data) {
+        setProfile({
+          name: res.data.name,
+          role: "AUTHORITY",
+          department: res.data.details.university,
+          oversight: res.data.details.hall,
+          designation: res.data.details.designation,
+          email: res.data.email,
+          image: "https://lh3.googleusercontent.com/aida-public/AB6AXuB5oskI4OkPzf5oLeAH1FLk55TwnpTvDtg1lWMO7m0wssIhhvHnBJ7t_LMlZ4E58S1MeCqr7anOLRd4RyY9TYsc7hQoLKXoz2KgFo9UHzCbB5dwX-0GfofprXogfEwPLpdBa7IBuWhDVfjB-3J3knG380CSpDstP2ImRRemVO89lgMQYakHA0C3tkQuHjQG95X04SG4NRayvtZXy9jy8my88pSAYPYcD3ULHdGvqm1xHDfHtJkF2zOuahwWD0F-CL8gpB3S90nXop0"
+        });
+      }
+      setLoading(false);
+    });
+  }, []);
 
   const handleChangePassword = () => {
     Swal.fire({
@@ -77,82 +98,37 @@ export default function AuthoritiesProfile() {
         }
         return { curr, nw };
       }
-    }).then((result) => {
-      if (result.isConfirmed) {
-        Swal.fire({
-          title: "SUCCESSFUL",
-          text: "Your administrative account password has been updated.",
-          icon: "success",
-          confirmButtonColor: "var(--color-primary, #000000)"
+    }).then(async (result) => {
+      if (result.isConfirmed && result.value) {
+        const res = await updateStudentPassword({
+          currentPassword: result.value.curr,
+          newPassword: result.value.nw
         });
+        if (res.success) {
+          Swal.fire({
+            title: "SUCCESSFUL",
+            text: "Your administrative account password has been updated.",
+            icon: "success",
+            confirmButtonColor: "var(--color-primary, #000000)"
+          });
+        } else {
+          Swal.fire({
+            title: "FAILED",
+            text: res.message || "Failed to update password.",
+            icon: "error",
+            confirmButtonColor: "var(--color-primary, #000000)"
+          });
+        }
       }
     });
   };
 
   const handleUpdateCredentials = () => {
     Swal.fire({
-      title: "UPDATE CREDENTIALS",
-      html: `
-        <div class="space-y-3 text-left">
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Full Name</label>
-            <input type="text" id="swal-edit-name" class="w-full px-3 py-2 border rounded-none border-slate-200 focus:outline-none focus:border-secondary" value="${profile.name}">
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Role / Title</label>
-            <input type="text" id="swal-edit-role" class="w-full px-3 py-2 border rounded-none border-slate-200 focus:outline-none focus:border-secondary" value="${profile.role}">
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Primary Affiliation</label>
-            <input type="text" id="swal-edit-dept" class="w-full px-3 py-2 border rounded-none border-slate-200 focus:outline-none focus:border-secondary" value="${profile.department}">
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Residential Oversight</label>
-            <input type="text" id="swal-edit-oversight" class="w-full px-3 py-2 border rounded-none border-slate-200 focus:outline-none focus:border-secondary" value="${profile.oversight}">
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">System Designation</label>
-            <input type="text" id="swal-edit-desig" class="w-full px-3 py-2 border rounded-none border-slate-200 focus:outline-none focus:border-secondary" value="${profile.designation}">
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Institutional Email</label>
-            <input type="email" id="swal-edit-email" class="w-full px-3 py-2 border rounded-none border-slate-200 focus:outline-none focus:border-secondary" value="${profile.email}">
-          </div>
-        </div>
-      `,
-      showCancelButton: true,
-      confirmButtonText: "SAVE CHANGES",
-      cancelButtonText: "CANCEL",
-      confirmButtonColor: "var(--color-primary, #000000)",
-      preConfirm: () => {
-        const name = (document.getElementById("swal-edit-name") as HTMLInputElement).value;
-        const role = (document.getElementById("swal-edit-role") as HTMLInputElement).value;
-        const department = (document.getElementById("swal-edit-dept") as HTMLInputElement).value;
-        const oversight = (document.getElementById("swal-edit-oversight") as HTMLInputElement).value;
-        const designation = (document.getElementById("swal-edit-desig") as HTMLInputElement).value;
-        const email = (document.getElementById("swal-edit-email") as HTMLInputElement).value;
-
-        if (!name || !role || !department || !oversight || !designation || !email) {
-          Swal.showValidationMessage("Please fill out all fields!");
-          return false;
-        }
-        return { name, role, department, oversight, designation, email };
-      }
-    }).then((result) => {
-      if (result.isConfirmed && result.value) {
-        setProfile({
-          ...profile,
-          ...result.value,
-          name: result.value.name.toUpperCase(),
-          role: result.value.role.toUpperCase()
-        });
-        Swal.fire({
-          title: "SUCCESSFUL",
-          text: "Your profile details have been updated.",
-          icon: "success",
-          confirmButtonColor: "var(--color-primary, #000000)"
-        });
-      }
+      title: "Mandate Restricted",
+      text: "Authority designations and university/hall registries can only be configured by system administrators.",
+      icon: "info",
+      confirmButtonColor: "var(--color-primary, #000000)"
     });
   };
 
