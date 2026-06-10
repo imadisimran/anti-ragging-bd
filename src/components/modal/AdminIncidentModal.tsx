@@ -8,7 +8,7 @@ import {
 
 } from "lucide-react";
 import Swal from "sweetalert2";
-import { getReporterBanStats, banReporter } from "@/actions/server/admin";
+import { getReporterBanStats, banReporter, rejectAdminIncident } from "@/actions/server/admin";
 import StatusBadge from "@/components/badge/StatusConfigBadge";
 import PriorityBadge from "@/components/badge/PriorityConfigBadge";
 import ProofLightboxModal from "@/components/modal/ProofLightboxModal";
@@ -137,22 +137,43 @@ export default function AdminIncidentModal({
         }
         return null;
       }
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed && result.value) {
         const reason = result.value;
-        const updatedIncident: Incident = {
-          ...incident,
-          status: "REJECTED",
-          rejectionReason: reason
-        };
-        onUpdateIncident(updatedIncident);
-        Swal.fire({
-          title: "Report Rejected",
-          text: `Case ${incidentId} has been rejected.`,
-          icon: "error",
-          timer: 2000,
-          timerProgressBar: true,
-        });
+        setProcessingModeration(true);
+        try {
+          const res = await rejectAdminIncident(incidentId, reason);
+          if (res.success) {
+            const updatedIncident: Incident = {
+              ...incident,
+              status: "REJECTED",
+              rejectionReason: reason
+            };
+            onUpdateIncident(updatedIncident);
+            Swal.fire({
+              title: "Report Rejected",
+              text: `Case ${incidentId} has been rejected.`,
+              icon: "error",
+              timer: 2000,
+              timerProgressBar: true,
+            });
+          } else {
+            Swal.fire({
+              title: "Error",
+              text: res.error || "Failed to reject report.",
+              icon: "error"
+            });
+          }
+        } catch (err) {
+          console.error(err);
+          Swal.fire({
+            title: "Error",
+            text: "An unexpected error occurred.",
+            icon: "error"
+          });
+        } finally {
+          setProcessingModeration(false);
+        }
       }
     });
   };
@@ -333,9 +354,9 @@ export default function AdminIncidentModal({
 
             <div className="flex justify-end w-full sm:w-auto">
               <button
-                disabled={incident.status === "REJECTED"}
+                disabled={incident.status === "REJECTED" || processingModeration}
                 onClick={() => handleRejectReport(incident.id)}
-                className="px-4 py-2.5 border border-error text-error font-bold text-label-md rounded hover:bg-red-50 active:scale-95 transition-all cursor-pointer shadow-sm w-full sm:w-auto"
+                className="px-4 py-2.5 border border-error text-error font-bold text-label-md rounded hover:bg-red-50 active:scale-95 transition-all cursor-pointer shadow-sm w-full sm:w-auto disabled:opacity-50"
               >
                 {incident.status !== "REJECTED" ? "Reject Report" : "Rejected"}
               </button>

@@ -23,17 +23,23 @@ export interface ModerationActionResponse {
   error?: string;
 }
 
+interface VerifyAdminAuth {
+  authorized: boolean;
+  userId?: string | null;
+  error?: string | null;
+}
+
 // Check if user has admin/teacher credentials
-async function verifyAdminAuth() {
+async function verifyAdminAuth(): Promise<VerifyAdminAuth> {
   const session = await getServerSession(authOptions)
   if (!session || !session.user) {
-    return { authorized: false, email: null, error: "Unauthorized. Please log in." }
+    return { authorized: false, error: "Unauthorized. Please log in." }
   }
   const role = session.user.role
-  if (role !== "ADMIN" && role !== "teacher") {
-    return { authorized: false, email: null, error: "Forbidden. Admin access required." }
+  if (role !== "ADMIN") {
+    return { authorized: false, error: "Forbidden. Admin access required." }
   }
-  return { authorized: true, email: session.user.email, error: null }
+  return { authorized: true, userId: session.user.userId }
 }
 
 // Fetch all reports pending human review appeal
@@ -110,7 +116,7 @@ export async function resolveAppeal(
       status: appealStatus,
       adminNote: adminNote || (action === "APPROVE" ? "Appeal approved by administrator." : "Appeal rejected by administrator."),
       resolvedAt: new Date(),
-      resolvedBy: auth.email
+      resolvedBy: auth.userId
     }
 
     // Append to updatedAt log array
@@ -118,7 +124,7 @@ export async function resolveAppeal(
       timestamp: new Date(),
       status: statusVal,
       verifiedBy: "Admin",
-      adminId: auth.email,
+      adminId: auth.userId,
       note: adminNote
     }
 
@@ -143,6 +149,64 @@ export async function resolveAppeal(
   } catch (error) {
     console.error("Error in resolveAppeal server action:", error)
     return { success: false, error: "Failed to resolve report appeal." }
+  }
+}
+
+// Directly reject an incident report
+export async function rejectAdminIncident(
+  postId: string,
+  rejectionReason: string
+): Promise<ModerationActionResponse> {
+  try {
+    const auth = await verifyAdminAuth()
+    if (!auth.authorized) {
+      return { success: false, error: auth.error || "Unauthorized" }
+    }
+
+    const report = await dbConnect(collections.REPORTS).findOne({ postId })
+    if (!report) {
+      return { success: false, error: "Report not found." }
+    }
+
+    const updatedVerification = {
+      ...(report.adminVerification || {}),
+      status: "REJECTED",
+      adminNote: rejectionReason,
+      resolvedAt: new Date(),
+      resolvedBy: auth.userId
+    }
+
+    // Append to updatedAt log array
+    const newUpdateLog = {
+      timestamp: new Date(),
+      status: "REJECTED",
+      verifiedBy: "Admin",
+      adminId: auth.userId,
+      note: rejectionReason
+    }
+
+    const result = await dbConnect(collections.REPORTS).updateOne(
+      { postId },
+      {
+        $set: {
+          isRaggingIncident: false,
+          status: "REJECTED",
+          rejectionReason: rejectionReason,
+          adminVerification: updatedVerification
+        },
+        $push: {
+          updatedAt: newUpdateLog
+        }
+      } as any
+    )
+
+    if (result.modifiedCount > 0) {
+      return { success: true, message: "Incident report successfully rejected." }
+    }
+    return { success: false, error: "Failed to update incident report status." }
+  } catch (error) {
+    console.error("Error in rejectAdminIncident server action:", error)
+    return { success: false, error: "Failed to reject incident report." }
   }
 }
 
