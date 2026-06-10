@@ -11,11 +11,24 @@ import {
   UserPlus,
   Loader2,
   X,
-  AlertTriangle
+  AlertTriangle,
+  Eye,
+  Unlock,
+  ShieldAlert,
+  UserMinus,
+  AlertOctagon
 } from "lucide-react";
 import Swal from "sweetalert2";
+import { useSession } from "next-auth/react";
 import { getRegisteredUsers, setupAuthorityProfile } from "@/actions/server/admin";
 import { getUniversitites, getStudyAreas } from "@/actions/server/profile";
+import { 
+  decryptStudentIdentity, 
+  revokeAuthorityMandate, 
+  promoteToAdmin, 
+  demoteFromAdmin 
+} from "@/actions/server/master-admin";
+import { createOversightReport } from "@/actions/server/oversight";
 
 interface RegisteredUser {
   id: string;
@@ -69,6 +82,169 @@ export default function UserManagement() {
   // DB selections
   const [universities, setUniversities] = useState<string[]>([]);
   const [halls, setHalls] = useState<string[]>([]);
+
+  const { data: session } = useSession();
+  const loggedInRole = session?.user?.role;
+  const currentUserId = session?.user?.userId;
+
+  const handleDecryptIdentity = async (user: RegisteredUser) => {
+    const result = await Swal.fire({
+      title: "Decrypt Student Identity?",
+      text: `Are you sure you want to reveal the real identity of Student "${user.userId}"? This action will be recorded in the system audit logs.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "var(--color-primary, #0f172a)",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, Decrypt",
+      cancelButtonText: "Cancel"
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const res = await decryptStudentIdentity(user.userId);
+        if (res.success && res.name && res.email) {
+          setUsers((prev) =>
+            prev.map((u) =>
+              u.userId === user.userId
+                ? { ...u, name: res.name!, email: res.email! }
+                : u
+            )
+          );
+          Swal.fire("Decrypted", "Student identity details successfully decrypted.", "success");
+        } else {
+          Swal.fire("Failed", res.error || "Failed to decrypt identity.", "error");
+        }
+      } catch (err: any) {
+        Swal.fire("Error", err.message || "An error occurred.", "error");
+      }
+    }
+  };
+
+  const handleRevokeAuthority = async (user: RegisteredUser) => {
+    const result = await Swal.fire({
+      title: "Revoke Authority Mandate?",
+      html: `Are you sure you want to revoke the authority mandate for:<br/><b>${user.name}</b>?<br/><br/><span class="text-xs text-slate-500">They will be demoted back to a regular student, and their account details will be re-encrypted.</span>`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "var(--color-primary, #0f172a)",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, Revoke Mandate",
+      cancelButtonText: "Cancel"
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const res = await revokeAuthorityMandate(user.userId);
+        if (res.success) {
+          setUsers((prev) =>
+            prev.map((u) =>
+              u.userId === user.userId
+                ? { ...u, role: "student", name: "ANONYMOUS", email: "REDACTED", authorityDetails: null }
+                : u
+            )
+          );
+          Swal.fire("Revoked", "Authority mandate revoked successfully.", "success");
+        } else {
+          Swal.fire("Failed", res.error || "Failed to revoke mandate.", "error");
+        }
+      } catch (err: any) {
+        Swal.fire("Error", err.message || "An error occurred.", "error");
+      }
+    }
+  };
+
+  const handlePromoteToAdmin = async (user: RegisteredUser) => {
+    const result = await Swal.fire({
+      title: "Promote User to Admin?",
+      html: `Are you sure you want to promote:<br/><b>${user.name}</b> (${user.userId}) to standard Admin role?<br/><br/><span class="text-xs text-slate-500">They will gain central oversight and moderation controls.</span>`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "var(--color-primary, #0f172a)",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, Promote",
+      cancelButtonText: "Cancel"
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const res = await promoteToAdmin(user.userId);
+        if (res.success) {
+          setUsers((prev) =>
+            prev.map((u) =>
+              u.userId === user.userId
+                ? { ...u, role: "ADMIN", authorityDetails: null }
+                : u
+            )
+          );
+          Swal.fire("Promoted", "User promoted to standard Admin role.", "success");
+        } else {
+          Swal.fire("Failed", res.error || "Failed to promote user.", "error");
+        }
+      } catch (err: any) {
+        Swal.fire("Error", err.message || "An error occurred.", "error");
+      }
+    }
+  };
+
+  const handleDemoteFromAdmin = async (user: RegisteredUser) => {
+    const result = await Swal.fire({
+      title: "Demote Admin?",
+      html: `Are you sure you want to remove Admin permissions for:<br/><b>${user.name}</b> (${user.userId})?<br/><br/><span class="text-xs text-slate-500">They will be demoted back to a regular student account.</span>`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "var(--color-primary, #0f172a)",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, Demote Admin",
+      cancelButtonText: "Cancel"
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const res = await demoteFromAdmin(user.userId);
+        if (res.success) {
+          setUsers((prev) =>
+            prev.map((u) =>
+              u.userId === user.userId
+                ? { ...u, role: "student", name: "ANONYMOUS", email: "REDACTED" }
+                : u
+            )
+          );
+          Swal.fire("Demoted", "Admin demoted to student role successfully.", "success");
+        } else {
+          Swal.fire("Failed", res.error || "Failed to demote Admin.", "error");
+        }
+      } catch (err: any) {
+        Swal.fire("Error", err.message || "An error occurred.", "error");
+      }
+    }
+  };
+
+  const handleReportColleague = async (user: RegisteredUser) => {
+    const { value: text } = await Swal.fire({
+      title: "Report Colleague to Master Admin",
+      input: "textarea",
+      inputLabel: `Explain the reason/evidence for reporting ${user.name || user.userId} (${user.role}):`,
+      inputPlaceholder: "Type your complaint note here...",
+      showCancelButton: true,
+      confirmButtonColor: "var(--color-primary, #0f172a)",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Submit Complaint",
+      cancelButtonText: "Cancel"
+    });
+
+    if (text) {
+      try {
+        const res = await createOversightReport(user.userId, text);
+        if (res.success) {
+          Swal.fire("Submitted", res.message || "Report successfully submitted to Master Admin queue.", "success");
+        } else {
+          Swal.fire("Failed", res.error || "Failed to submit report.", "error");
+        }
+      } catch (err: any) {
+        Swal.fire("Error", err.message || "An error occurred.", "error");
+      }
+    }
+  };
 
   // Load universities
   useEffect(() => {
@@ -383,7 +559,10 @@ export default function UserManagement() {
                   <div className="fixed inset-0 z-10" onClick={() => setShowFilterDropdown(false)}></div>
                   <div className="absolute right-0 mt-2 w-56 bg-white border border-outline-variant rounded-lg shadow-lg p-3 z-20 space-y-2 animate-in fade-in duration-100">
                     <h4 className="text-[10px] font-bold text-outline uppercase tracking-wider mb-1 px-1">Filter by Role</h4>
-                    {["All", "student", "AUTHORITY", "ADMIN"].map((r) => (
+                    {(loggedInRole === "MASTER_ADMIN" 
+                      ? ["All", "student", "AUTHORITY", "ADMIN", "MASTER_ADMIN"] 
+                      : ["All", "student", "AUTHORITY", "ADMIN"]
+                    ).map((r) => (
                       <button
                         key={r}
                         onClick={() => {
@@ -396,7 +575,15 @@ export default function UserManagement() {
                             : "hover:bg-slate-50 text-on-surface-variant"
                         }`}
                       >
-                        {r === "student" ? "Student" : r === "AUTHORITY" ? "Authority" : r === "ADMIN" ? "Admin" : "All Roles"}
+                        {r === "student"
+                          ? "Student"
+                          : r === "AUTHORITY"
+                          ? "Authority"
+                          : r === "ADMIN"
+                          ? "Admin"
+                          : r === "MASTER_ADMIN"
+                          ? "Master Admin"
+                          : "All Roles"}
                       </button>
                     ))}
                   </div>
@@ -441,20 +628,44 @@ export default function UserManagement() {
                         {user.userId}
                       </td>
                       <td className="px-6 py-4 text-body-md text-on-surface font-semibold uppercase">
-                        {user.name}
+                        <div className="flex items-center gap-2">
+                          <span>{user.name}</span>
+                          {user.name === "ANONYMOUS" && loggedInRole === "MASTER_ADMIN" && (
+                            <button
+                              onClick={() => handleDecryptIdentity(user)}
+                              className="text-primary hover:text-opacity-80 p-1 cursor-pointer transition-colors"
+                              title="Decrypt Identity"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-body-md text-on-surface-variant select-all">
-                        {user.email}
+                        <div className="flex items-center gap-2">
+                          <span>{user.email}</span>
+                          {user.email === "REDACTED" && loggedInRole === "MASTER_ADMIN" && (
+                            <button
+                              onClick={() => handleDecryptIdentity(user)}
+                              className="text-primary hover:text-opacity-80 p-1 cursor-pointer transition-colors"
+                              title="Decrypt Identity"
+                            >
+                              <Unlock className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-block px-3 py-1 rounded-full text-label-sm font-bold uppercase tracking-wider ${
-                          user.role === "ADMIN"
+                          user.role === "MASTER_ADMIN"
+                            ? "bg-slate-900 text-slate-100"
+                            : user.role === "ADMIN"
                             ? "bg-purple-100 text-purple-800"
                             : user.role === "AUTHORITY"
                             ? "bg-green-100 text-green-800"
                             : "bg-blue-100 text-blue-800"
                         }`}>
-                          {user.role}
+                          {user.role === "MASTER_ADMIN" ? "Master Admin" : user.role}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-body-md text-on-surface-variant font-medium">
@@ -471,14 +682,82 @@ export default function UserManagement() {
                         )}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        {user.role !== "ADMIN" && (
-                          <button
-                            onClick={() => handleOpenSetupModal(user)}
-                            className="bg-primary text-on-primary hover:bg-opacity-95 px-3 py-1.5 rounded text-label-sm font-bold transition-all flex items-center gap-1.5 ml-auto cursor-pointer shadow-sm active:scale-95"
-                          >
-                            <UserPlus className="w-4 h-4" />
-                            <span>{user.role === "AUTHORITY" ? "Update Setup" : "Setup Authority"}</span>
-                          </button>
+                        {/* Master Admin Actions */}
+                        {loggedInRole === "MASTER_ADMIN" && (
+                          <div className="flex gap-2 justify-end">
+                            {user.role === "student" && (
+                              <>
+                                <button
+                                  onClick={() => handleOpenSetupModal(user)}
+                                  className="bg-primary text-on-primary hover:bg-opacity-95 px-3 py-1.5 rounded text-label-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                                >
+                                  <UserPlus className="w-4 h-4" />
+                                  <span>Setup Authority</span>
+                                </button>
+                                <button
+                                  onClick={() => handlePromoteToAdmin(user)}
+                                  className="bg-purple-600 text-white hover:bg-purple-700 px-3 py-1.5 rounded text-label-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                                >
+                                  <ShieldAlert className="w-4 h-4" />
+                                  <span>Make Admin</span>
+                                </button>
+                              </>
+                            )}
+
+                            {user.role === "AUTHORITY" && (
+                              <>
+                                <button
+                                  onClick={() => handleRevokeAuthority(user)}
+                                  className="bg-red-600 text-white hover:bg-red-700 px-3 py-1.5 rounded text-label-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                                >
+                                  <UserMinus className="w-4 h-4" />
+                                  <span>Revoke Mandate</span>
+                                </button>
+                                <button
+                                  onClick={() => handlePromoteToAdmin(user)}
+                                  className="bg-purple-600 text-white hover:bg-purple-700 px-3 py-1.5 rounded text-label-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                                >
+                                  <ShieldAlert className="w-4 h-4" />
+                                  <span>Make Admin</span>
+                                </button>
+                              </>
+                            )}
+
+                            {user.role === "ADMIN" && (
+                              <button
+                                onClick={() => handleDemoteFromAdmin(user)}
+                                className="bg-red-600 text-white hover:bg-red-700 px-3 py-1.5 rounded text-label-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                              >
+                                <UserMinus className="w-4 h-4" />
+                                <span>Remove Admin</span>
+                              </button>
+                            )}
+
+                            {user.role === "MASTER_ADMIN" && user.userId !== currentUserId && (
+                              <button
+                                onClick={() => handleDemoteFromAdmin(user)}
+                                className="bg-red-600 text-white hover:bg-red-700 px-3 py-1.5 rounded text-label-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                              >
+                                <UserMinus className="w-4 h-4" />
+                                <span>Demote Master</span>
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Standard Admin Actions */}
+                        {loggedInRole === "ADMIN" && (
+                          <div className="flex justify-end">
+                            {user.userId !== currentUserId && (user.role === "ADMIN" || user.role === "AUTHORITY") && (
+                              <button
+                                onClick={() => handleReportColleague(user)}
+                                className="bg-amber-600 text-white hover:bg-amber-700 px-3 py-1.5 rounded text-label-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                              >
+                                <AlertOctagon className="w-4 h-4" />
+                                <span>Report Colleague</span>
+                              </button>
+                            )}
+                          </div>
                         )}
                       </td>
                     </tr>

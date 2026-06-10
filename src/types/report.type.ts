@@ -7,6 +7,8 @@ export interface ShortReport {
     location: string;
     createdAt: Date;
     status: string;
+    upVotesCount?: number;
+    upVotesBy?: string[];
 }
 
 export interface ShortReports {

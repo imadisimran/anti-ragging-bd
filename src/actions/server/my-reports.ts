@@ -21,6 +21,7 @@ export interface MyDetailedReport {
   narrative: string;
   rejectionReason: string | null;
   upVotesCount: number;
+  upVotesBy?: string[];
   adminVerification: {
     isRequested: boolean;
     appealNote: string;
@@ -67,6 +68,7 @@ export async function getMyDetailedReports(): Promise<MyReportsResponse> {
       narrative: item.narrative || "",
       rejectionReason: item.rejectionReason || null,
       upVotesCount: item.upVotesCount || 0,
+      upVotesBy: item.upVotesBy || [],
       adminVerification: item.adminVerification || null,
     }))
 

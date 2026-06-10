@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { 
   MapPin, 
@@ -21,6 +21,9 @@ import {
   Archive
 } from "lucide-react";
 import { MyDetailedReport, submitReportAppeal } from "@/actions/server/my-reports";
+import { useSession } from "next-auth/react";
+import Swal from "sweetalert2";
+import { toggleUpvoteReport } from "@/actions/server/upvote";
 
 interface MyReportCardProps {
   report: MyDetailedReport;
@@ -30,6 +33,67 @@ interface MyReportCardProps {
 export default function MyReportCard({ report, showToast }: MyReportCardProps) {
   const [activeTab, setActiveTab] = useState<"public" | "original">("public");
   const [isAccordionOpen, setIsAccordionOpen] = useState<boolean>(false);
+  
+  const { data: session } = useSession();
+  const userId = session?.user?.userId;
+
+  const [upVotesCount, setUpVotesCount] = useState(report.upVotesCount || 0);
+  const [hasUpvoted, setHasUpvoted] = useState(false);
+
+  useEffect(() => {
+    if (userId && report.upVotesBy) {
+      setHasUpvoted(report.upVotesBy.includes(userId));
+    } else {
+      setHasUpvoted(false);
+    }
+  }, [userId, report.upVotesBy]);
+
+  useEffect(() => {
+    setUpVotesCount(report.upVotesCount || 0);
+  }, [report.upVotesCount]);
+
+  const handleUpvote = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!session || !userId) {
+      Swal.fire({
+        title: "Login Required",
+        text: "Please log in to upvote.",
+        icon: "warning",
+        confirmButtonColor: "var(--p)",
+      });
+      return;
+    }
+
+    const nextHasUpvoted = !hasUpvoted;
+    const nextCount = nextHasUpvoted ? upVotesCount + 1 : upVotesCount - 1;
+    setHasUpvoted(nextHasUpvoted);
+    setUpVotesCount(nextCount);
+
+    try {
+      const res = await toggleUpvoteReport(report.postId);
+      if (res.success) {
+        if (res.upVotesCount !== undefined) {
+          setUpVotesCount(res.upVotesCount);
+        }
+        if (res.hasUpvoted !== undefined) {
+          setHasUpvoted(res.hasUpvoted);
+        }
+      } else {
+        setHasUpvoted(!nextHasUpvoted);
+        setUpVotesCount(upVotesCount);
+        Swal.fire({
+          title: "Error",
+          text: res.error || "Failed to toggle upvote.",
+          icon: "error",
+          confirmButtonColor: "var(--p)",
+        });
+      }
+    } catch (err) {
+      setHasUpvoted(!nextHasUpvoted);
+      setUpVotesCount(upVotesCount);
+      console.error(err);
+    }
+  };
   
   // Appeal state
   const [isAppealModalOpen, setIsAppealModalOpen] = useState<boolean>(false);
@@ -283,10 +347,15 @@ export default function MyReportCard({ report, showToast }: MyReportCardProps) {
       {/* Engagement Metrics Bar */}
       {!isModerationFlow && (
         <div className="px-6 py-3 bg-surface flex flex-wrap items-center gap-8 border-b border-outline-variant">
-          <div className="flex items-center gap-2 text-label-sm font-semibold text-on-surface-variant">
-            <ThumbsUp className="w-[18px] h-[18px] text-secondary fill-secondary" />
-            <span>{report.upVotesCount} Community Upvotes</span>
-          </div>
+          <button 
+            onClick={handleUpvote}
+            className={`flex items-center gap-2 text-label-sm font-semibold transition-colors duration-200 hover:text-secondary cursor-pointer ${
+              hasUpvoted ? "text-secondary" : "text-on-surface-variant"
+            }`}
+          >
+            <ThumbsUp className={`w-[18px] h-[18px] transition-transform duration-200 active:scale-125 ${hasUpvoted ? "text-secondary fill-secondary" : ""}`} />
+            <span>{upVotesCount} Community Upvotes</span>
+          </button>
           <div className="flex items-center gap-2 text-label-sm font-semibold text-on-surface-variant">
             <MessageSquare className="w-[18px] h-[18px] text-primary fill-primary" />
             <span>

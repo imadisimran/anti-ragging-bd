@@ -37,7 +37,7 @@ async function verifyAdminAuth(): Promise<VerifyAdminAuth> {
     return { authorized: false, error: "Unauthorized. Please log in." }
   }
   const role = session.user.role
-  if (role !== "ADMIN") {
+  if (role !== "ADMIN" && role !== "MASTER_ADMIN") {
     return { authorized: false, error: "Forbidden. Admin access required." }
   }
   return { authorized: true, userId: session.user.userId }
@@ -468,20 +468,32 @@ export interface GetUsersOptions {
 
 export async function getRegisteredUsers(options: GetUsersOptions = {}) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.authorized) {
-      return { success: false, error: auth.error || "Unauthorized" };
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
+      return { success: false, error: "Unauthorized. Please log in." };
+    }
+    const requesterRole = session.user.role;
+    if (requesterRole !== "ADMIN" && requesterRole !== "MASTER_ADMIN") {
+      return { success: false, error: "Forbidden. Admin access required." };
     }
 
     const { limit = 10, skip = 0, searchQuery = "", roleFilter = "All" } = options;
 
     const query: any = {};
 
+    // Standard admins cannot see MASTER_ADMIN accounts in the registry
+    if (requesterRole === "ADMIN") {
+      query.role = { $ne: "MASTER_ADMIN" };
+    }
+
     // Apply role filter
     if (roleFilter !== "All") {
       if (roleFilter === "BANNED") {
         query.reportingBanUntil = { $exists: true, $gt: new Date() };
       } else {
+        if (roleFilter === "MASTER_ADMIN" && requesterRole === "ADMIN") {
+          return { success: true, data: [], total: 0 };
+        }
         query.role = roleFilter;
       }
     }
@@ -563,9 +575,9 @@ export async function setupAuthorityProfile(
   }
 ) {
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.authorized) {
-      return { success: false, error: auth.error || "Unauthorized" };
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user || session.user.role !== "MASTER_ADMIN") {
+      return { success: false, error: "Forbidden. Master Admin access required." };
     }
 
     if (!data.name || !data.email || !data.designation || !data.university || !data.hall) {

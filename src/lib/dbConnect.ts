@@ -33,13 +33,17 @@ interface Collections {
   VERIFICATION_TOKENS: string;
   UNIVERSITIES: string;
   REPORTS: string;
+  AUDIT_LOGS: string;
+  OVERSIGHT_REPORTS: string;
 }
 
 export const collections: Collections = {
   USERS: "users",
   VERIFICATION_TOKENS: "verificationTokens",
   UNIVERSITIES: "universities",
-  REPORTS:"reports"
+  REPORTS:"reports",
+  AUDIT_LOGS: "auditLogs",
+  OVERSIGHT_REPORTS: "oversightReports"
 }
 
 export const dbConnect = (collectionName: string) => {

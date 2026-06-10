@@ -13,7 +13,10 @@ import {
   ChevronLeft, 
   ChevronRight,
   Scale,
-  ShieldAlert
+  ShieldAlert,
+  History,
+  Sliders,
+  AlertOctagon
 } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -82,7 +85,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </NavLinkDashboard>
           )}
 
-          {role === "ADMIN" && (
+          {(role === "ADMIN" || role === "MASTER_ADMIN") && (
             <>
               <NavLinkDashboard href="/dashboard/appeals" isCollapsed={isCollapsed} icon={<Scale className="w-5 h-5 flex-shrink-0" />}>
                 Appeals
@@ -92,6 +95,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </NavLinkDashboard>
               <NavLinkDashboard href="/dashboard/user-management" isCollapsed={isCollapsed} icon={<Users className="w-5 h-5 flex-shrink-0" />}>
                 User Registry
+              </NavLinkDashboard>
+            </>
+          )}
+
+          {role === "MASTER_ADMIN" && (
+            <>
+              <div className="pt-2 pb-1 px-3">
+                <p className={`text-[10px] font-bold text-outline uppercase tracking-wider ${isCollapsed ? "hidden" : "block"}`}>
+                  Supreme Control
+                </p>
+              </div>
+              <NavLinkDashboard href="/dashboard/oversight-reports" isCollapsed={isCollapsed} icon={<AlertOctagon className="w-5 h-5 flex-shrink-0" />}>
+                Oversight Queue
+              </NavLinkDashboard>
+              <NavLinkDashboard href="/dashboard/audit-logs" isCollapsed={isCollapsed} icon={<History className="w-5 h-5 flex-shrink-0" />}>
+                Audit Logs
+              </NavLinkDashboard>
+              <NavLinkDashboard href="/dashboard/master-controls" isCollapsed={isCollapsed} icon={<Sliders className="w-5 h-5 flex-shrink-0" />}>
+                Master Controls
               </NavLinkDashboard>
             </>
           )}
