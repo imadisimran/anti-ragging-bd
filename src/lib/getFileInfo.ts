@@ -1,4 +1,4 @@
-import { ProofUrlType } from "@/types/AdminDashboardTypes";
+import { ProofUrlType } from "@/types/DashboardTypes";
 
 export interface ProofObject {
   secureUrl: string;

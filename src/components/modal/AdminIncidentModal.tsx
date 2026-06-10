@@ -2,13 +2,10 @@ import React, { useState, useEffect } from "react";
 import {
   MapPin,
   Calendar,
-  Paperclip,
-  Users,
   AlertCircle,
   X,
   ShieldAlert,
-  ZoomIn,
-  Clock,
+
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { getReporterBanStats, banReporter } from "@/actions/server/admin";
@@ -16,7 +13,7 @@ import StatusBadge from "@/components/badge/StatusConfigBadge";
 import PriorityBadge from "@/components/badge/PriorityConfigBadge";
 import ProofLightboxModal from "@/components/modal/ProofLightboxModal";
 import EvidenceAttachmentList from "@/components/evidence/EvidenceAttachmentList";
-import { AdminIncidentModalProps, Incident } from "@/types/AdminDashboardTypes";
+import { AdminIncidentModalProps, Incident } from "@/types/DashboardTypes";
 
 
 export default function AdminIncidentModal({
@@ -174,6 +171,10 @@ export default function AdminIncidentModal({
               <span className="text-headline-md font-extrabold text-primary">{incident.id}</span>
               <PriorityBadge priority={incident.priority} />
               <StatusBadge status={incident.status} variant="filled" />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-label-sm font-bold text-outline uppercase tracking-wider">Reporter ID</span>
+              <span className="text-headline-md font-extrabold text-primary">{incident.userId}</span>
             </div>
             <button
               onClick={onClose}

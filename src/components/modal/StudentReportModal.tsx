@@ -11,7 +11,7 @@ import {
   AlertCircle,
   Scale
 } from "lucide-react";
-import { StudentReport } from "@/actions/server/dashboard";
+import { StudentReport } from "@/actions/server/Student";
 import ProofLightboxModal from "@/components/modal/ProofLightboxModal";
 import EvidenceAttachmentList from "@/components/evidence/EvidenceAttachmentList";
 

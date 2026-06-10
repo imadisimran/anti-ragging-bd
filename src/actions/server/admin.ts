@@ -267,6 +267,7 @@ export interface DetailAdminIncident {
   adminVerification?: any;
   isRaggingIncident?: boolean;
   rejectionReason?: string | null;
+  userId: string
 }
 
 export async function getAdminIncidents(options: GetAdminIncidentsOptions = {}): Promise<{ success: boolean; data?: BriefAdminIncident[]; error?: string; total?: number }> {
@@ -361,7 +362,8 @@ export async function getAdminIncidentDetails(postId: string): Promise<{ success
           "proofUrls.resource_type": 1,
           adminVerification: 1,
           isRaggingIncident: 1,
-          rejectionReason: 1
+          rejectionReason: 1,
+          "studentDetails.userId": 1
         }
       }
     );
@@ -382,6 +384,7 @@ export async function getAdminIncidentDetails(postId: string): Promise<{ success
       adminVerification: item.adminVerification || null,
       isRaggingIncident: item.isRaggingIncident ?? false,
       rejectionReason: item.rejectionReason || null,
+      userId: item.studentDetails?.userId?.split(":")[0] || "",
     };
 
     return { success: true, data };

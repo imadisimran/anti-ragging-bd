@@ -16,7 +16,7 @@ import { getAdminIncidents, getAdminIncidentDetails, BriefAdminIncident, DetailA
 import StatusBadge from "@/components/badge/StatusConfigBadge";
 import PriorityBadge from "@/components/badge/PriorityConfigBadge";
 import AdminIncidentModal from "@/components/modal/AdminIncidentModal";
-import { Incident } from "@/types/AdminDashboardTypes";
+import { Incident } from "@/types/DashboardTypes";
 
 
 export default function AdminDashboardHome() {
@@ -127,7 +127,7 @@ export default function AdminDashboardHome() {
         const item = res.data;
         let priority: "High" | "Medium" | "Low" = "Low";
         if (item.detectedSeverity === "HIGH") priority = "High";
-        else if (item.detectedSeverity === "MEDIUM") priority = "Medium";        
+        else if (item.detectedSeverity === "MEDIUM") priority = "Medium";
         const formattedIncident: Incident = {
           id: item.postId || "",
           timestamp: item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "",
@@ -143,6 +143,7 @@ export default function AdminDashboardHome() {
           rejectionReason: item.rejectionReason || null,
           adminVerification: item.adminVerification || null,
           proofUrls: item.proofUrls || [],
+          userId: item.userId
         };
 
         setSelectedIncident(formattedIncident);
@@ -368,18 +369,18 @@ export default function AdminDashboardHome() {
                   {incidents.map((incident) => {
                     const formattedDate = incident.createdAt
                       ? new Date(incident.createdAt).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
                       : "";
                     const mappedPriority =
                       incident.detectedSeverity === "HIGH"
                         ? "High"
                         : incident.detectedSeverity === "MEDIUM"
-                        ? "Medium"
-                        : "Low";
+                          ? "Medium"
+                          : "Low";
 
                     return (
                       <tr

@@ -8,7 +8,7 @@ import {
   Eye,
 } from "lucide-react";
 import { getFileInfo, ProofItem } from "@/lib/getFileInfo";
-import { ProofUrlType } from "@/types/AdminDashboardTypes";
+import { ProofUrlType } from "@/types/DashboardTypes";
 
 export interface EvidenceAttachmentListProps {
   proofUrls: ProofUrlType[];

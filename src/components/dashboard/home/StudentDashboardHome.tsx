@@ -14,7 +14,7 @@ import {
   Filter,
   ChevronDown,
 } from "lucide-react";
-import { getStudentReports, getStudentReportDetail, StudentReport } from "@/actions/server/dashboard";
+import { getStudentReports, getStudentReportDetail, StudentReport } from "@/actions/server/Student";
 import StudentReportModal from "@/components/modal/StudentReportModal";
 
 export default function StudentDashboardHome() {

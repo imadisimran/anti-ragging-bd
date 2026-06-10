@@ -13,6 +13,7 @@ export interface Incident {
     rejectionReason?: string | null;
     adminVerification?: any;
     proofUrls?: ProofUrlType[];
+    userId: string;
 }
 
 export interface ProofUrlType { secureUrl: string; resource_type: string }

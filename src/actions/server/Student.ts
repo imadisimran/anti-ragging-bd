@@ -4,7 +4,7 @@ import { dbConnect, collections } from "@/lib/dbConnect"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/authOptions"
 import { generateBlindIndex } from "@/lib/encryption"
-import { ProofUrlType } from "@/types/AdminDashboardTypes"
+import { ProofUrlType } from "@/types/DashboardTypes"
 
 export interface StudentReport {
   postId: string;
