@@ -12,7 +12,8 @@ import {
   HelpCircle, 
   ChevronLeft, 
   ChevronRight,
-  Scale
+  Scale,
+  ShieldAlert
 } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -75,10 +76,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             My Posts
           </NavLinkDashboard>
 
+          {(role === "student" || !role) && (
+            <NavLinkDashboard href="/dashboard/my-appeals" isCollapsed={isCollapsed} icon={<Scale className="w-5 h-5 flex-shrink-0" />}>
+              My Appeals
+            </NavLinkDashboard>
+          )}
+
           {role === "ADMIN" && (
             <>
               <NavLinkDashboard href="/dashboard/appeals" isCollapsed={isCollapsed} icon={<Scale className="w-5 h-5 flex-shrink-0" />}>
                 Appeals
+              </NavLinkDashboard>
+              <NavLinkDashboard href="/dashboard/ban-management" isCollapsed={isCollapsed} icon={<ShieldAlert className="w-5 h-5 flex-shrink-0" />}>
+                Ban Control
               </NavLinkDashboard>
               <NavLinkDashboard href="/dashboard/user-management" isCollapsed={isCollapsed} icon={<Users className="w-5 h-5 flex-shrink-0" />}>
                 User Registry

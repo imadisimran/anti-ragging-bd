@@ -479,7 +479,11 @@ export async function getRegisteredUsers(options: GetUsersOptions = {}) {
 
     // Apply role filter
     if (roleFilter !== "All") {
-      query.role = roleFilter;
+      if (roleFilter === "BANNED") {
+        query.reportingBanUntil = { $exists: true, $gt: new Date() };
+      } else {
+        query.role = roleFilter;
+      }
     }
 
     // Apply search query
@@ -516,18 +520,13 @@ export async function getRegisteredUsers(options: GetUsersOptions = {}) {
       const isStudent = item.role === "student" || !item.role;
       let name = item.name || "";
       let email = item.email || "";
+      let studentDetails = item.studentDetails || null;
 
       if (isStudent) {
-        try {
-          name = decryptData(item.name);
-        } catch {
-          name = item.name || "";
-        }
-        try {
-          email = decryptData(item.email);
-        } catch {
-          email = item.email || "";
-        }
+        // Redact student details to ensure admin can only see userIds and nothing more
+        name = "ANONYMOUS";
+        email = "REDACTED";
+        studentDetails = null;
       }
 
       return {
@@ -539,7 +538,10 @@ export async function getRegisteredUsers(options: GetUsersOptions = {}) {
         createdAt: item.createdAt || new Date(),
         isVerified: item.isVerified || false,
         authorityDetails: item.authorityDetails || null,
-        studentDetails: item.studentDetails || null
+        studentDetails,
+        reportingBanUntil: item.reportingBanUntil || null,
+        reportingBanReason: item.reportingBanReason || null,
+        banHistoryCount: item.banHistoryCount || 0
       };
     });
 
@@ -594,5 +596,78 @@ export async function setupAuthorityProfile(
   } catch (error: any) {
     console.error("Error in setupAuthorityProfile:", error);
     return { success: false, error: error.message || "Failed to configure authority profile." };
+  }
+}
+
+export async function liftReporterSuspension(userId: string): Promise<ModerationActionResponse> {
+  try {
+    const auth = await verifyAdminAuth();
+    if (!auth.authorized) {
+      return { success: false, error: auth.error || "Unauthorized" };
+    }
+
+    const result = await dbConnect(collections.USERS).updateOne(
+      { userId },
+      {
+        $set: {
+          reportingBanUntil: null,
+          reportingBanReason: null
+        }
+      }
+    );
+
+    if (result.matchedCount > 0) {
+      return { success: true, message: "User reporting suspension successfully lifted." };
+    }
+    return { success: false, error: "User account not found." };
+  } catch (error: any) {
+    console.error("Error in liftReporterSuspension:", error);
+    return { success: false, error: error.message || "Failed to lift user suspension." };
+  }
+}
+
+export async function getBanMetrics(): Promise<{
+  success: boolean;
+  totalActiveBans: number;
+  temporarySuspensions: number;
+  permanentBans: number;
+  error?: string;
+}> {
+  try {
+    const auth = await verifyAdminAuth();
+    if (!auth.authorized) {
+      return { success: false, totalActiveBans: 0, temporarySuspensions: 0, permanentBans: 0, error: auth.error || "Unauthorized" };
+    }
+
+    const now = new Date();
+    const tenYearsFromNow = new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000);
+
+    const totalActiveBans = await dbConnect(collections.USERS).countDocuments({
+      reportingBanUntil: { $exists: true, $gt: now }
+    });
+
+    const temporarySuspensions = await dbConnect(collections.USERS).countDocuments({
+      reportingBanUntil: { $exists: true, $gt: now, $lt: tenYearsFromNow }
+    });
+
+    const permanentBans = await dbConnect(collections.USERS).countDocuments({
+      reportingBanUntil: { $exists: true, $gt: tenYearsFromNow }
+    });
+
+    return {
+      success: true,
+      totalActiveBans,
+      temporarySuspensions,
+      permanentBans
+    };
+  } catch (error: any) {
+    console.error("Error in getBanMetrics:", error);
+    return {
+      success: false,
+      totalActiveBans: 0,
+      temporarySuspensions: 0,
+      permanentBans: 0,
+      error: error.message || "Failed to fetch ban metrics."
+    };
   }
 }
