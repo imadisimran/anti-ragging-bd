@@ -23,8 +23,6 @@ export default function AdminDashboardHome() {
   const [incidents, setIncidents] = useState<BriefAdminIncident[]>([]);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  // DB status loader state
-  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   // Search & Filter state
@@ -32,6 +30,7 @@ export default function AdminDashboardHome() {
   const [priorityFilter, setPriorityFilter] = useState<string>("All");
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [sectionLoading, setSectionLoading] = useState(true)
 
   // Infinite scroll state
   const [hasMore, setHasMore] = useState(true);
@@ -44,8 +43,9 @@ export default function AdminDashboardHome() {
   useEffect(() => {
     let active = true;
     const loadData = async () => {
-      setLoading(true);
+      setSectionLoading(true);
       setError(null);
+
       try {
         const res = await getAdminIncidents({
           limit: 5,
@@ -66,7 +66,9 @@ export default function AdminDashboardHome() {
         console.error(err);
         if (active) setError("An unexpected error occurred while fetching incidents.");
       } finally {
-        if (active) setLoading(false);
+        if (active) {
+          setSectionLoading(false)
+        }
       }
     };
     loadData();
@@ -162,15 +164,6 @@ export default function AdminDashboardHome() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
   };
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
-        <Loader2 className="w-10 h-10 animate-spin text-primary" />
-        <p className="text-body-md text-on-surface-variant font-medium">Loading command center dashboard...</p>
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -364,7 +357,32 @@ export default function AdminDashboardHome() {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant">
-              {incidents.length > 0 ? (
+              {sectionLoading ? (
+                <>
+                  {[...Array(5)].map((_, idx) => (
+                    <tr key={idx} className="animate-pulse">
+                      <td className="px-6 py-4">
+                        <div className="h-4 bg-slate-200 rounded w-24"></div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="h-4 bg-slate-200 rounded w-32"></div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="h-4 bg-slate-200 rounded w-28"></div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="h-6 bg-slate-200 rounded-full w-16"></div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="h-6 bg-slate-200 rounded-full w-20"></div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="h-5 bg-slate-200 rounded w-5 ml-auto"></div>
+                      </td>
+                    </tr>
+                  ))}
+                </>
+              ) : incidents.length > 0 ? (
                 <>
                   {incidents.map((incident) => {
                     const formattedDate = incident.createdAt
