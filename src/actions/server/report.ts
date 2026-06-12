@@ -2,9 +2,37 @@
 import { collections, dbConnect } from "@/lib/dbConnect"
 import { ReportDetail, ShortReport, ShortReports } from "@/types/report.type"
 
-export const getShortReports = async (): Promise<ShortReports> => {
+export const getShortReports = async (limit?: number, skip?: number): Promise<ShortReports> => {
     try {
-        const rawData = await dbConnect(collections.REPORTS).find({ isRaggingIncident: true }, { projection: { postId: 1, sanitizedTitle: 1, sanitizedDescription: 1, dateTime: 1, university: 1, specificLocation: 1, createdAt: 1, "studentDetails.userId": 1, status: 1, upVotesCount: 1, upVotesBy: 1 } }).toArray()
+        let query = dbConnect(collections.REPORTS)
+            .find(
+                { isRaggingIncident: true },
+                {
+                    projection: {
+                        postId: 1,
+                        sanitizedTitle: 1,
+                        sanitizedDescription: 1,
+                        dateTime: 1,
+                        university: 1,
+                        specificLocation: 1,
+                        createdAt: 1,
+                        "studentDetails.userId": 1,
+                        status: 1,
+                        upVotesCount: 1,
+                        upVotesBy: 1,
+                    },
+                }
+            )
+            .sort({ createdAt: -1 });
+
+        if (skip !== undefined) {
+            query = query.skip(skip);
+        }
+        if (limit !== undefined) {
+            query = query.limit(limit);
+        }
+
+        const rawData = await query.toArray();
         const data: ShortReport[] = rawData.map(item => ({
             postId: item.postId,
             userId: item.studentDetails?.userId ? item.studentDetails.userId.split(":")[0] : "",

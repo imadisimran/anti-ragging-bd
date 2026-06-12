@@ -1,9 +1,9 @@
 import { Filter, AlertTriangle } from "lucide-react";
-import PostCard from "@/components/home/PostCard";
 import { getShortReports } from "@/actions/server/report";
+import InfiniteReports from "@/components/home/InfiniteReports";
 
 export default async function Home() {
-  const response = await getShortReports()
+  const response = await getShortReports(4, 0)
   return (
     <div className="max-w-4xl mx-auto">
       <header className="mb-stack-lg flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
@@ -28,15 +28,8 @@ export default async function Home() {
               {response.error || "An unexpected database or connection error occurred."}
             </p>
           </div>
-        ) : !response.data || response.data.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-8 text-center bg-surface-container-low border border-outline-variant rounded-xl">
-            <h3 className="text-headline-sm font-bold text-on-surface-variant">No reports found</h3>
-            <p className="text-body-md text-on-surface-variant mt-1">
-              There are currently no documented incidents.
-            </p>
-          </div>
         ) : (
-          response.data.map(r => (<PostCard key={r.postId} report={r}></PostCard>))
+          <InfiniteReports initialReports={response.data || []} />
         )}
       </div>
 
