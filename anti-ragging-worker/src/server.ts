@@ -190,9 +190,13 @@ ABSOLUTE SAFETY & MODERATION RULES:
 ${proofFiles.length > 0 ? `
 CRITICAL PROOF ANALYSIS (VIDEO/IMAGE/AUDIO):
 You have been provided with attached multimedia evidence files. Analyze this evidence strictly in relation to the user's text description:
-1. RELEVANCE CHECK: If the uploaded content is completely irrelevant (e.g., a random meme, movie clip, empty classroom, or spam), you MUST set "isRaggingIncident" to false and set "rejectionReason" to "Irrelevant multimedia proof content provided".
-2. CORROBORATION CHECK: Evaluate if the visual/audible elements back up the text. For example, if the text claims "10 boys dragged me" but the video only shows 2 people talking calmly, adjust and lower the "detectedSeverity" tracking matrix accordingly.
-3. VERDICT RULE: If the proof matches or correlates with the narrative of harassment, mental/physical abuse, or intimidation, "isRaggingIncident" MUST be true. Set the severity according to both textual and visual gravity.
+1. ONLINE DOWNLOAD / FAKE PROOF DETECTION: Examine the files. If there are indicators that the proof file was downloaded from the internet (e.g., stock images, generic news screenshots, matching public web assets, or obvious internet memes) instead of being captured directly by the victim:
+   - You MUST classify the report as fraudulent.
+   - Set "isRaggingIncident" to false.
+   - Set "rejectionReason" to "Fake proof: Multimedia evidence appears to be downloaded from an online source."
+2. RELEVANCE CHECK: If the uploaded content is completely irrelevant (e.g., a random meme, movie clip, empty classroom, or spam), you MUST set "isRaggingIncident" to false and set "rejectionReason" to "Irrelevant multimedia proof content provided".
+3. CORROBORATION CHECK: Evaluate if the visual/audible elements back up the text. For example, if the text claims "10 boys dragged me" but the video only shows 2 people talking calmly, adjust and lower the "detectedSeverity" tracking matrix accordingly.
+4. VERDICT RULE: If the proof matches or correlates with the narrative of harassment, mental/physical abuse, or intimidation, "isRaggingIncident" MUST be true. Set the severity according to both textual and visual gravity.
 ` : ''}
 
 OUTPUT FORMAT SPECIFICATION:
